@@ -173,9 +173,26 @@ impl State {
 
     fn focus_and_center(&mut self, id: u64) {
         if let Some(i) = self.index_of_id(id) {
+            self.leave_fullscreen_for(i);
             let window = self.windows[i].window.clone();
             self.focus_window(Some(window));
             self.center_on(0);
+        }
+    }
+
+    /// A fullscreen window would keep covering the one being jumped to, so
+    /// it goes back to where it was (like Hyprland does).
+    fn leave_fullscreen_for(&mut self, target: usize) {
+        let ws = self.windows[target].ws;
+        let covering: Vec<usize> = (0..self.windows.len())
+            .filter(|&i| {
+                i != target
+                    && self.windows[i].ws == ws
+                    && self.windows[i].placement == Placement::Fullscreen
+            })
+            .collect();
+        for i in covering {
+            self.restore(i);
         }
     }
 

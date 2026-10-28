@@ -148,7 +148,8 @@ impl State {
         )
     }
 
-    /// Every output lists all workspaces, so each bar shows 1..10.
+    /// Like Hyprland, a bar lists only the workspaces that exist there: the
+    /// one its output shows and the ones holding windows.
     fn bar_workspaces(&self) -> Vec<Value> {
         let focused_output = self.active_output();
         let mut list = Vec::new();
@@ -160,6 +161,9 @@ impl State {
                     .windows
                     .iter()
                     .any(|m| m.mapped && m.ws == ws && m.placement != Placement::Pinned);
+                if !active && !occupied {
+                    continue;
+                }
                 list.push(json!({
                     "id": workspace_id(&output.name(), ws),
                     "index": ws + 1,
