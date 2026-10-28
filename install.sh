@@ -49,12 +49,17 @@ FILES=(
     "$SESSIONS_DIR/pzwm.desktop"
     "$PREFIX/lib/systemd/user/pzwm-session.target"
     "$PREFIX/share/xdg-desktop-portal/pzwm-portals.conf"
+    "$PREFIX/bin/pzwm-config"
+    "$PREFIX/share/applications/pzwm-config.desktop"
+    "$PREFIX/share/pzwm-config"
 )
+CONFIG_APP_FILES=(pzwm_config.py pages.py schema.py tomlpatch.py)
 
 if [ "$UNINSTALL" = 1 ]; then
     bold "Removing pzwm"
     for f in "${FILES[@]}"; do
-        if [ -e "$f" ] || [ -L "$f" ]; then $SUDO rm -f "$f" && ok "removed $f"; fi
+        if [ -d "$f" ]; then $SUDO rm -rf "$f" && ok "removed $f"
+        elif [ -e "$f" ] || [ -L "$f" ]; then $SUDO rm -f "$f" && ok "removed $f"; fi
     done
     echo "Your config in ~/.config/pzwm was left alone."
     exit 0
@@ -91,6 +96,13 @@ $SUDO ln -sf pzwm "$PREFIX/bin/umbriel"
 $SUDO install -Dm644 resources/pzwm.desktop "$SESSIONS_DIR/pzwm.desktop"
 $SUDO install -Dm644 resources/pzwm-session.target "$PREFIX/lib/systemd/user/pzwm-session.target"
 $SUDO install -Dm644 resources/pzwm-portals.conf "$PREFIX/share/xdg-desktop-portal/pzwm-portals.conf"
+# pzwm config: the settings app (Python + GTK 4 + libadwaita).
+for f in "${CONFIG_APP_FILES[@]}"; do
+    $SUDO install -Dm644 "resources/pzwm-config/$f" "$PREFIX/share/pzwm-config/$f"
+done
+printf '#!/bin/sh\nexec python3 %s/share/pzwm-config/pzwm_config.py "$@"\n' "$PREFIX" \
+    | $SUDO install -Dm755 /dev/stdin "$PREFIX/bin/pzwm-config"
+$SUDO install -Dm644 resources/pzwm-config.desktop "$PREFIX/share/applications/pzwm-config.desktop"
 for f in "${FILES[@]}"; do ok "$f"; done
 if [ "$PREFIX" != /usr ] && [ "$PREFIX" != /usr/local ]; then
     warn "$PREFIX/bin must be in PATH for display managers to find pzwm-session"
@@ -98,6 +110,9 @@ fi
 
 if [ "$(id -u)" -ne 0 ]; then
     systemctl --user daemon-reload 2>/dev/null || true
+    # A development launcher from before the system install would hide it.
+    dev_entry="${XDG_DATA_HOME:-$HOME/.local/share}/applications/pzwm-config.desktop"
+    if grep -qs '^X-pzwm-dev=true' "$dev_entry"; then rm -f "$dev_entry"; fi
     config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/pzwm"
     if [ ! -f "$config_dir/config.toml" ]; then
         install -Dm644 resources/default-config.toml "$config_dir/config.toml"
@@ -110,6 +125,8 @@ fi
 for opt in xwayland-satellite grim slurp wl-copy; do
     command -v "$opt" >/dev/null || warn "optional: '$opt' not found (see README)"
 done
+python3 -c "import gi; gi.require_version('Adw', '1')" 2>/dev/null \
+    || warn "pzwm config needs PyGObject, GTK 4 and libadwaita (run ./install.sh --deps)"
 
 echo
 bold "Done."

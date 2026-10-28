@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=pzwm config
+GenericName=Window manager settings
+Comment=Change the pzwm settings: monitors, shortcuts, canvas and looks
+Exec=pzwm-config
+Icon=preferences-system
+Terminal=false
+Categories=Settings;DesktopSettings;GTK;
+Keywords=pzwm;window manager;compositor;shortcuts;monitor;settings;
+StartupNotify=true

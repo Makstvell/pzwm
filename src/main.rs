@@ -20,7 +20,7 @@ mod shell;
 mod state;
 
 use std::{
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -42,7 +42,8 @@ OPTIONS:
   --nested          run in a window inside the current compositor
   --tty             run on the TTY (default when no compositor is running)
   --autostart       also run [general] autostart when nested (always on a TTY)
-  --check-config    validate ~/.config/pzwm/config.toml and exit
+  --check-config [FILE]
+                    validate ~/.config/pzwm/config.toml (or FILE) and exit
   --print-default-config
                     print the documented default config
   -V, --version     print version
@@ -64,8 +65,9 @@ fn main() {
         print!("{}", config::DEFAULT_CONFIG);
         return;
     }
-    if args.iter().any(|a| a == "--check-config") {
-        std::process::exit(check_config());
+    if let Some(i) = args.iter().position(|a| a == "--check-config") {
+        let file = args.get(i + 1).filter(|a| !a.starts_with("--"));
+        std::process::exit(check_config(file.map(PathBuf::from)));
     }
     // Installed as `umbriel` too, for DankMaterialShell (see bar.rs).
     let as_umbriel = std::env::args()
@@ -115,8 +117,8 @@ fn main() {
     }
 }
 
-fn check_config() -> i32 {
-    let path = Config::path();
+fn check_config(file: Option<PathBuf>) -> i32 {
+    let path = file.unwrap_or_else(Config::path);
     let text = match std::fs::read_to_string(&path) {
         Ok(text) => text,
         Err(err) => {
