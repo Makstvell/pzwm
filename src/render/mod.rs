@@ -1,6 +1,6 @@
 //! Builds the element list for one output, front to back:
 //! cursor → lock screen → overlay layer → fullscreen → bar (top layer) →
-//! snap preview → windows with their frames → canvas grid → bottom and
+//! minimap → snap preview → windows with their frames → canvas grid → bottom and
 //! background layers (the wallpaper).
 
 pub mod shaders;
@@ -14,7 +14,7 @@ use smithay::{
     backend::renderer::{
         ImportAll, ImportMem, Renderer, RendererSuper, Texture,
         element::{
-            AsRenderElements, Kind,
+            AsRenderElements, Element, Id, Kind,
             memory::MemoryRenderBufferRenderElement,
             render_elements,
             surface::{
@@ -36,6 +36,7 @@ use smithay::{
 
 use crate::{
     canvas::grid_level,
+    minimap::{MapKey, MapLayout},
     shell::{Placement, View},
     state::State,
 };
@@ -89,12 +90,17 @@ render_elements! {
 pub struct RenderCache {
     frames: HashMap<u64, ShaderElement>,
     grids: HashMap<String, ShaderElement>,
+    minimap: HashMap<(String, MapKey), ShaderElement>,
+    /// Ids of minimap previews, by output and the surface element they copy.
+    thumbs: HashMap<(String, Id), Id>,
     preview: ShaderElement,
 }
 
 impl RenderCache {
     pub fn forget(&mut self, window_id: u64) {
         self.frames.remove(&window_id);
+        self.minimap
+            .retain(|(_, key), _| *key != MapKey::Window(window_id));
     }
 }
 
@@ -113,6 +119,26 @@ pub fn output_elements<R: PzRenderer>(
     output: &Output,
 ) -> (Vec<PzElement<R>>, [f32; 4]) {
     let os = output.current_scale().fractional_scale();
+    scaled_output_elements(state, renderer, output, os)
+}
+
+/// Scale (physical per logical pixel) that fits `source` into a mirror
+/// output of `mirror` pixels without cropping.
+pub fn mirror_scale(mirror: Size<i32, Physical>, source: Size<i32, Logical>) -> f64 {
+    if source.w <= 0 || source.h <= 0 {
+        return 1.0;
+    }
+    (mirror.w as f64 / source.w as f64).min(mirror.h as f64 / source.h as f64)
+}
+
+/// What `output` shows, drawn at `os` physical pixels per logical pixel.
+/// Mirrors use it to show their source at their own resolution.
+pub fn scaled_output_elements<R: PzRenderer>(
+    state: &mut State,
+    renderer: &mut R,
+    output: &Output,
+    os: f64,
+) -> (Vec<PzElement<R>>, [f32; 4]) {
     let shaders = Shaders::get(renderer.gles());
     let now = Instant::now();
     let mut out: Vec<PzElement<R>> = Vec::new();
@@ -157,6 +183,9 @@ pub fn output_elements<R: PzRenderer>(
         );
     } else {
         layer_elements(renderer, output, Layer::Top, os, &mut out);
+        if let Some(sh) = shaders.as_ref() {
+            minimap_elements(state, renderer, output, os, sh, &mut out);
+        }
     }
 
     // The edge-tiling preview sits right under the window being dragged.
@@ -363,7 +392,6 @@ fn window_elements<R: PzRenderer>(
         Kind::Unspecified,
     );
     for elem in elems {
-        use smithay::backend::renderer::element::Element;
         let tex_size = match elem.texture() {
             WaylandSurfaceTexture::Texture(tex) => Some(tex.size()),
             WaylandSurfaceTexture::SolidColor(_) => None,
@@ -494,6 +522,105 @@ fn grid_element(
     Some(elem.update(&sh.grid, rect, 1.0, &uniforms).clone())
 }
 
+fn minimap_elements<R: PzRenderer>(
+    state: &mut State,
+    renderer: &mut R,
+    output: &Output,
+    os: f64,
+    sh: &Shaders,
+    out: &mut Vec<PzElement<R>>,
+) {
+    const PANEL_RADIUS: f64 = 10.0;
+    const ITEM_RADIUS: f64 = 3.0;
+    let Some(layout) = state.minimap_layout(output) else {
+        return;
+    };
+    let shapes = state.minimap_shapes(output);
+    let alpha = state.minimap_alpha(output);
+    let name = output.name();
+    let mut used_thumbs = Vec::new();
+    for shape in shapes {
+        let radius = if shape.key == MapKey::Panel {
+            PANEL_RADIUS
+        } else {
+            ITEM_RADIUS
+        };
+        let uniforms = [
+            ("u_fill", ShaderValue::F4(shape.fill)),
+            ("u_stroke", ShaderValue::F4(shape.stroke)),
+            ("u_radius", ShaderValue::F1((radius * os) as f32)),
+            ("u_border", ShaderValue::F1(os.max(1.0) as f32)),
+        ];
+        let elem = state
+            .render_cache
+            .minimap
+            .entry((name.clone(), shape.key))
+            .or_default();
+        out.push(PzElement::Shader(
+            elem.update(&sh.rect, phys_rect(shape.rect, os), alpha, &uniforms)
+                .clone(),
+        ));
+        if let Some(idx) = shape.window {
+            let clip = Clip {
+                rect: shape.rect.to_physical(os),
+                radius_top: (ITEM_RADIUS * os) as f32,
+                radius_bottom: (ITEM_RADIUS * os) as f32,
+            };
+            for thumb in thumbnail_elements(state, renderer, idx, &layout, clip, os, alpha, sh) {
+                let key = (name.clone(), thumb.id().clone());
+                let id = state
+                    .render_cache
+                    .thumbs
+                    .entry(key.clone())
+                    .or_insert_with(Id::new)
+                    .clone();
+                used_thumbs.push(key);
+                out.push(PzElement::Clipped(thumb.with_id(id)));
+            }
+        }
+    }
+    state
+        .render_cache
+        .thumbs
+        .retain(|key, _| key.0 != name || used_thumbs.contains(key));
+}
+
+/// Live preview of a canvas window on the minimap: its surface tree scaled
+/// down to the map and clipped to the window's map rectangle.
+#[allow(clippy::too_many_arguments)]
+fn thumbnail_elements<R: PzRenderer>(
+    state: &State,
+    renderer: &mut R,
+    idx: usize,
+    layout: &MapLayout,
+    clip: Clip,
+    os: f64,
+    alpha: f32,
+    sh: &Shaders,
+) -> Vec<ClippedSurface<R>> {
+    let m = &state.windows[idx];
+    let Some(surface) = m.wl_surface() else {
+        return Vec::new();
+    };
+    let zoom = layout.scale();
+    let geo = m.window.geometry();
+    let origin = layout.point_to_map(m.pos) - geo.loc.to_f64().upscale(zoom);
+    let origin = origin.to_physical(os).to_i32_round();
+    let elems: Vec<WaylandSurfaceRenderElement<R>> =
+        render_elements_from_surface_tree(renderer, &surface, origin, os, alpha, Kind::Unspecified);
+    elems
+        .into_iter()
+        .map(|elem| {
+            let tex_size = match elem.texture() {
+                WaylandSurfaceTexture::Texture(tex) => Some(tex.size()),
+                WaylandSurfaceTexture::SolidColor(_) => None,
+            };
+            let zoomed = RescaleRenderElement::from_element(elem, origin, Scale::from(zoom));
+            ClippedSurface::new(zoomed, tex_size, clip, sh.clip.clone())
+        })
+        .collect()
+}
+
 fn preview_element(
     state: &mut State,
     rect: Rectangle<f64, Logical>,
@@ -539,6 +666,7 @@ pub fn post_render(state: &mut State, output: &Output) {
     let time = state.clock.now();
     let first_output = state.outputs.first() == Some(output);
     let output_rect = Rectangle::from_size(state.output_geometry(output).size).to_f64();
+    let on_map = state.minimap_layout(output).is_some();
 
     for m in &state.windows {
         let visible = state.view(m, output).and_then(|view| {
@@ -555,7 +683,16 @@ pub fn post_render(state: &mut State, output: &Output) {
             }
             None => {
                 m.window.output_leave(output);
-                if first_output {
+                // Off-screen windows keep drawing at full rate while their
+                // preview is on the minimap.
+                let previewed =
+                    on_map && m.placement == Placement::Canvas && state.view(m, output).is_some();
+                if previewed {
+                    m.window
+                        .send_frame(output, time, Some(Duration::ZERO), |_, _| {
+                            Some(output.clone())
+                        });
+                } else if first_output {
                     // Hidden windows still get a slow tick so they never freeze.
                     m.window
                         .send_frame(output, time, Some(Duration::from_millis(995)), |_, _| None);
@@ -585,5 +722,33 @@ pub fn post_render(state: &mut State, output: &Output) {
         send_frames_surface_tree(surface, output, time, Some(Duration::ZERO), |_, _| {
             Some(output.clone())
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use smithay::utils::Size;
+
+    use super::mirror_scale;
+
+    #[test]
+    fn mirror_scale_fits_same_aspect_exactly() {
+        // 2560x1440 at scale 1.5 is 1707x960 logical; a 1080p mirror.
+        let s = mirror_scale(Size::from((1920, 1080)), Size::from((1707, 960)));
+        assert!((s - 1.125).abs() < 1e-3);
+    }
+
+    #[test]
+    fn mirror_scale_never_crops_other_aspect() {
+        let s = mirror_scale(Size::from((1280, 1024)), Size::from((1920, 1080)));
+        assert!(1920.0 * s <= 1280.0 + 1e-9 && 1080.0 * s <= 1024.0 + 1e-9);
+    }
+
+    #[test]
+    fn mirror_scale_survives_empty_source() {
+        assert_eq!(
+            mirror_scale(Size::from((1920, 1080)), Size::from((0, 0))),
+            1.0
+        );
     }
 }

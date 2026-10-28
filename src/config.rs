@@ -9,7 +9,10 @@ use serde::Deserialize;
 use smithay::input::keyboard::{Keysym, ModifiersState, xkb};
 use tracing::warn;
 
-use crate::action::Action;
+use crate::{
+    action::Action,
+    input::{BTN_BACK, BTN_FORWARD, BTN_LEFT, BTN_MIDDLE, BTN_RIGHT},
+};
 
 pub const DEFAULT_CONFIG: &str = include_str!("../resources/default-config.toml");
 
@@ -21,11 +24,15 @@ pub struct Config {
     pub canvas: Canvas,
     pub animation: Animation,
     pub appearance: Appearance,
+    pub minimap: Minimap,
     #[serde(rename = "output")]
     pub outputs: Vec<OutputConfig>,
     pub binds: HashMap<String, String>,
     #[serde(skip)]
     pub keybinds: Vec<Keybind>,
+    pub mouse: HashMap<String, String>,
+    #[serde(skip)]
+    pub mousebinds: Vec<MouseBind>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -42,6 +49,10 @@ pub struct General {
     pub cursor_size: u32,
     /// Ask clients to drop their own titlebars so pzwm draws its own.
     pub prefer_server_decorations: bool,
+    /// Scale (DPI factor) for outputs without their own `[[output]] scale`.
+    pub scale: f64,
+    /// Re-read the config as soon as the file is saved.
+    pub auto_reload: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -89,6 +100,38 @@ pub struct Canvas {
     pub grid_spacing: f64,
     /// Each workspace remembers its own camera (true) or all share one.
     pub per_workspace_camera: bool,
+    /// Dragging the titlebar moves the window. Off: windows stay where they
+    /// are and only move with the `move-window` mouse bind.
+    pub titlebar_drag: bool,
+    /// Invisible grab zone outside window edges for resizing, screen pixels.
+    pub resize_margin: f64,
+    /// Length of the diagonal (corner) resize zone along each edge.
+    pub resize_corner: f64,
+    /// Size new windows open at, as a fraction (0.1 .. 1.0) of the usable
+    /// screen area. Dialogs and fixed-size windows keep their own size.
+    pub new_window_width: f64,
+    pub new_window_height: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct Minimap {
+    pub enabled: bool,
+    /// "cursor" (hidden until called, opens under the pointer),
+    /// "bottom-right", "bottom-left", "top-right" or "top-left" (always on).
+    pub position: String,
+    /// Width in logical pixels; height follows the screen's aspect ratio.
+    pub width: f64,
+    /// Width of the map called up at the cursor.
+    pub popup_width: f64,
+    #[serde(deserialize_with = "de_color")]
+    pub background: [f32; 4],
+    #[serde(deserialize_with = "de_color")]
+    pub window_color: [f32; 4],
+    #[serde(deserialize_with = "de_color")]
+    pub focused_color: [f32; 4],
+    #[serde(deserialize_with = "de_color")]
+    pub viewport_color: [f32; 4],
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -140,6 +183,8 @@ pub struct OutputConfig {
     /// "x,y" in logical pixels; outputs are laid out left to right when absent.
     pub position: Option<String>,
     pub disable: bool,
+    /// Name of another output to show a copy of instead of its own area.
+    pub mirror: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -147,6 +192,45 @@ pub struct Keybind {
     pub mods: Mods,
     pub sym: Keysym,
     pub action: Action,
+}
+
+/// What a mouse bind reacts to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MouseTrigger {
+    Button(u32),
+    Scroll,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MouseAction {
+    /// Drag: pan the canvas. Scroll: pan along the scroll direction.
+    Pan,
+    /// Scroll: pan sideways with a plain wheel.
+    PanHorizontal,
+    /// Scroll: the wheel zooms around the cursor, a touchpad pans.
+    Zoom,
+    MoveWindow,
+    ResizeWindow,
+}
+
+impl MouseAction {
+    fn parse(s: &str) -> Option<Self> {
+        Some(match s.trim().to_lowercase().as_str() {
+            "pan" => Self::Pan,
+            "pan-horizontal" => Self::PanHorizontal,
+            "zoom" => Self::Zoom,
+            "move-window" | "move" => Self::MoveWindow,
+            "resize-window" | "resize" => Self::ResizeWindow,
+            _ => return None,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MouseBind {
+    pub mods: Mods,
+    pub trigger: MouseTrigger,
+    pub action: MouseAction,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -178,9 +262,12 @@ impl Default for Config {
             canvas: Canvas::default(),
             animation: Animation::default(),
             appearance: Appearance::default(),
+            minimap: Minimap::default(),
             outputs: Vec::new(),
             binds: HashMap::new(),
             keybinds: Vec::new(),
+            mouse: HashMap::new(),
+            mousebinds: Vec::new(),
         }
     }
 }
@@ -197,6 +284,8 @@ impl Default for General {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(24),
             prefer_server_decorations: true,
+            scale: 1.0,
+            auto_reload: true,
         }
     }
 }
@@ -236,6 +325,26 @@ impl Default for Canvas {
             grid: "dots".into(),
             grid_spacing: 32.0,
             per_workspace_camera: true,
+            titlebar_drag: true,
+            resize_margin: 12.0,
+            resize_corner: 28.0,
+            new_window_width: 0.6,
+            new_window_height: 0.7,
+        }
+    }
+}
+
+impl Default for Minimap {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            position: "cursor".into(),
+            width: 220.0,
+            popup_width: 560.0,
+            background: rgba(0x0f1117d9),
+            window_color: rgba(0x4b5263ff),
+            focused_color: rgba(0x22d3eeff),
+            viewport_color: rgba(0x8b5cf6ff),
         }
     }
 }
@@ -324,6 +433,16 @@ impl Config {
         }
     }
 
+    /// Like [`Config::load`], but reports a broken file instead of falling
+    /// back, so a reload can keep the config that is running now.
+    pub fn try_load() -> Result<Self, String> {
+        let path = Self::path();
+        match std::fs::read_to_string(&path) {
+            Ok(text) => Self::parse(&text).map_err(|err| format!("{}: {err}", path.display())),
+            Err(_) => Ok(Self::builtin()),
+        }
+    }
+
     pub fn builtin() -> Self {
         Self::parse(DEFAULT_CONFIG).expect("built-in default config must parse")
     }
@@ -362,11 +481,65 @@ impl Config {
             })
             .collect();
         self.binds = binds;
+
+        let mut mouse: HashMap<String, String> = toml::from_str::<DefaultBinds>(DEFAULT_CONFIG)
+            .map(|d| d.mouse)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (normalize_combo(&k), v))
+            .collect();
+        for (k, v) in std::mem::take(&mut self.mouse) {
+            mouse.insert(normalize_combo(&k), v);
+        }
+        self.mousebinds = mouse
+            .iter()
+            .filter_map(|(combo, action)| {
+                let (mods, trigger) = parse_mouse_combo(combo).or_else(|| {
+                    warn!("unknown mouse combination `{combo}`");
+                    None
+                })?;
+                let action = MouseAction::parse(action).or_else(|| {
+                    if action.trim() != "none" {
+                        warn!("unknown mouse action `{action}` for `{combo}`");
+                    }
+                    None
+                })?;
+                Some(MouseBind {
+                    mods,
+                    trigger,
+                    action,
+                })
+            })
+            .collect();
+        self.mouse = mouse;
         self
     }
 
     pub fn output(&self, name: &str) -> Option<&OutputConfig> {
         self.outputs.iter().find(|o| o.name == name)
+    }
+
+    /// Scale for an output: its own `scale`, else `[general] scale`.
+    pub fn output_scale(&self, name: &str) -> f64 {
+        self.output(name)
+            .and_then(|o| o.scale)
+            .unwrap_or(self.general.scale)
+            .clamp(0.5, 4.0)
+    }
+
+    pub fn mouse_bind(&self, mods: Mods, trigger: MouseTrigger) -> Option<MouseAction> {
+        self.mousebinds
+            .iter()
+            .find(|b| b.mods == mods && b.trigger == trigger)
+            .map(|b| b.action)
+    }
+}
+
+impl OutputConfig {
+    /// Parses `position = "x,y"`.
+    pub fn position(&self) -> Option<(i32, i32)> {
+        let (x, y) = self.position.as_deref()?.split_once(',')?;
+        Some((x.trim().parse().ok()?, y.trim().parse().ok()?))
     }
 }
 
@@ -374,6 +547,7 @@ impl Config {
 #[serde(default)]
 struct DefaultBinds {
     binds: HashMap<String, String>,
+    mouse: HashMap<String, String>,
 }
 
 /// Canonical form so "Shift+Super+q" and "super + shift + Q" are one key.
@@ -391,11 +565,8 @@ fn normalize_combo(combo: &str) -> String {
     mods.join("+")
 }
 
-/// Parses "Super+Shift+Return" into modifiers and a keysym.
-pub fn parse_combo(combo: &str) -> Option<(Mods, Keysym)> {
+fn parse_mods<'a>(parts: impl Iterator<Item = &'a str>) -> Option<Mods> {
     let mut mods = Mods::default();
-    let mut parts: Vec<&str> = combo.split('+').map(str::trim).collect();
-    let key = parts.pop()?;
     for m in parts {
         match m.to_lowercase().as_str() {
             "super" | "mod" | "logo" | "win" => mods.logo = true,
@@ -405,6 +576,31 @@ pub fn parse_combo(combo: &str) -> Option<(Mods, Keysym)> {
             _ => return None,
         }
     }
+    Some(mods)
+}
+
+/// Parses "Super+Shift+left" or "Super+scroll" into modifiers and a trigger.
+pub fn parse_mouse_combo(combo: &str) -> Option<(Mods, MouseTrigger)> {
+    let mut parts: Vec<&str> = combo.split('+').map(str::trim).collect();
+    let key = parts.pop()?;
+    let mods = parse_mods(parts.into_iter())?;
+    let trigger = match key.to_lowercase().as_str() {
+        "left" => MouseTrigger::Button(BTN_LEFT),
+        "right" => MouseTrigger::Button(BTN_RIGHT),
+        "middle" => MouseTrigger::Button(BTN_MIDDLE),
+        "back" | "side" => MouseTrigger::Button(BTN_BACK),
+        "forward" | "extra" => MouseTrigger::Button(BTN_FORWARD),
+        "scroll" | "wheel" => MouseTrigger::Scroll,
+        _ => return None,
+    };
+    Some((mods, trigger))
+}
+
+/// Parses "Super+Shift+Return" into modifiers and a keysym.
+pub fn parse_combo(combo: &str) -> Option<(Mods, Keysym)> {
+    let mut parts: Vec<&str> = combo.split('+').map(str::trim).collect();
+    let key = parts.pop()?;
+    let mods = parse_mods(parts.into_iter())?;
     let mut sym = xkb::keysym_from_name(key, xkb::KEYSYM_NO_FLAGS);
     if sym.raw() == 0 {
         sym = xkb::keysym_from_name(key, xkb::KEYSYM_CASE_INSENSITIVE);
@@ -463,6 +659,59 @@ mod tests {
                 .iter()
                 .any(|k| k.mods == m && k.sym == y && k.action == Action::Close)
         );
+    }
+
+    #[test]
+    fn mouse_binds_parse_and_layer_over_defaults() {
+        let cfg = Config::parse(
+            "[mouse]\n\"Super+left\" = \"none\"\n\"Alt+right\" = \"resize-window\"\n",
+        )
+        .unwrap();
+        let sup = Mods {
+            logo: true,
+            ..Mods::default()
+        };
+        let sup_shift = Mods { shift: true, ..sup };
+        let alt = Mods {
+            alt: true,
+            ..Mods::default()
+        };
+        assert_eq!(cfg.mouse_bind(sup, MouseTrigger::Button(BTN_LEFT)), None);
+        assert_eq!(
+            cfg.mouse_bind(sup_shift, MouseTrigger::Button(BTN_LEFT)),
+            Some(MouseAction::MoveWindow)
+        );
+        assert_eq!(
+            cfg.mouse_bind(sup, MouseTrigger::Scroll),
+            Some(MouseAction::Zoom)
+        );
+        assert_eq!(
+            cfg.mouse_bind(alt, MouseTrigger::Button(BTN_RIGHT)),
+            Some(MouseAction::ResizeWindow)
+        );
+        assert!(parse_mouse_combo("Super+wheel").is_some());
+        assert!(parse_mouse_combo("Super+button9").is_none());
+    }
+
+    #[test]
+    fn output_scale_falls_back_to_general() {
+        let cfg = Config::parse(
+            "[general]\nscale = 1.5\n[[output]]\nname = \"HDMI-A-1\"\nscale = 1.0\nposition = \"1707, 0\"\n",
+        )
+        .unwrap();
+        assert_eq!(cfg.output_scale("eDP-1"), 1.5);
+        assert_eq!(cfg.output_scale("HDMI-A-1"), 1.0);
+        assert_eq!(cfg.output("HDMI-A-1").unwrap().position(), Some((1707, 0)));
+    }
+
+    #[test]
+    fn output_mirror_is_parsed() {
+        let cfg = Config::parse("[[output]]\nname = \"HDMI-A-1\"\nmirror = \"eDP-1\"\n").unwrap();
+        assert_eq!(
+            cfg.output("HDMI-A-1").unwrap().mirror.as_deref(),
+            Some("eDP-1")
+        );
+        assert!(cfg.output("eDP-1").is_none());
     }
 
     #[test]

@@ -66,6 +66,14 @@ fn handle(state: &mut State, request: &str) -> String {
         ["windows"] => windows(state),
         ["outputs"] => outputs(state),
         ["pointer", rest @ ..] => pointer(state, rest),
+        ["profile", rest @ ..] => match state.profile_command(rest) {
+            Ok(msg) => msg,
+            Err(err) => format!("error: {err}"),
+        },
+        ["reload"] => match state.reload_config() {
+            Ok(()) => "ok: config reloaded".into(),
+            Err(err) => format!("error: {err}"),
+        },
         _ => match Action::parse(request) {
             Some(action) => {
                 state.do_action(action);
@@ -79,17 +87,7 @@ fn handle(state: &mut State, request: &str) -> String {
 fn windows(state: &State) -> String {
     let mut out = String::new();
     for m in &state.windows {
-        let title = m
-            .window
-            .toplevel()
-            .and_then(|t| {
-                smithay::wayland::compositor::with_states(t.wl_surface(), |s| {
-                    s.data_map
-                        .get::<smithay::wayland::shell::xdg::XdgToplevelSurfaceData>()
-                        .and_then(|d| d.lock().ok().and_then(|d| d.app_id.clone()))
-                })
-            })
-            .unwrap_or_default();
+        let title = state.app_id(m).unwrap_or_default();
         let size = m.size();
         let focused = state.focused.as_ref() == Some(&m.window);
         out.push_str(&format!(

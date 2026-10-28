@@ -2,6 +2,7 @@
 
 mod action;
 mod backend;
+mod bar;
 mod bindings;
 mod canvas;
 mod config;
@@ -10,7 +11,9 @@ mod grabs;
 mod handlers;
 mod input;
 mod ipc;
+mod minimap;
 mod navigation;
+mod profiles;
 mod render;
 mod screencopy;
 mod shell;
@@ -30,6 +33,8 @@ const HELP: &str = "\
 pzwm — infinite-canvas Wayland compositor
 
 USAGE: pzwm [OPTIONS]
+       pzwm reload          re-read the config in the running session
+                            (it also reloads by itself when the file is saved)
        pzwm msg <request>   talk to a running pzwm, e.g.
                             pzwm msg workspace 2 | zoom-in | overview | windows | outputs
 
@@ -62,8 +67,21 @@ fn main() {
     if args.iter().any(|a| a == "--check-config") {
         std::process::exit(check_config());
     }
-    if args.first().map(String::as_str) == Some("msg") {
-        match ipc::send(&args[1..].join(" ")) {
+    // Installed as `umbriel` too, for DankMaterialShell (see bar.rs).
+    let as_umbriel = std::env::args()
+        .next()
+        .is_some_and(|a| Path::new(&a).file_name().is_some_and(|n| n == "umbriel"));
+    let request = match args.first().map(String::as_str) {
+        Some("msg") if as_umbriel => match bar::translate_umbriel(&args[1..].join(" ")) {
+            Some(request) => Some(request),
+            None => std::process::exit(1),
+        },
+        Some("msg") => Some(args[1..].join(" ")),
+        Some("reload") => Some("reload".to_string()),
+        _ => None,
+    };
+    if let Some(request) = request {
+        match ipc::send(&request) {
             Ok(reply) => {
                 println!("{reply}");
                 std::process::exit(if reply.starts_with("error") { 1 } else { 0 });
@@ -137,6 +155,8 @@ fn run(nested: bool) -> anyhow::Result<()> {
     let socket = state.socket_name.to_string_lossy().into_owned();
     info!("listening on WAYLAND_DISPLAY={socket}");
     let ipc_path = ipc::init(&mut state)?;
+    let bar_path = bar::init(&mut state)?;
+    state.watch_config();
     // SAFETY: still single-threaded; nothing else reads the environment concurrently.
     unsafe {
         std::env::set_var("WAYLAND_DISPLAY", &socket);
@@ -144,6 +164,8 @@ fn run(nested: bool) -> anyhow::Result<()> {
         std::env::set_var("XDG_SESSION_DESKTOP", "pzwm");
         std::env::set_var("XDG_SESSION_TYPE", "wayland");
         std::env::set_var("PZWM_SOCKET", &ipc_path);
+        // DankMaterialShell's workspace widget, see bar.rs.
+        std::env::set_var("UMBRIEL_SOCKET", &bar_path);
         std::env::set_var("XCURSOR_THEME", &state.config.general.cursor_theme);
         std::env::set_var("XCURSOR_SIZE", state.config.general.cursor_size.to_string());
         std::env::remove_var("DISPLAY");
@@ -176,6 +198,7 @@ fn run(nested: bool) -> anyhow::Result<()> {
 
     event_loop.run(None, &mut state, |state| {
         state.popups.cleanup();
+        state.bar_publish();
         if let Err(err) = state.display_handle.flush_clients() {
             warn!("flush_clients: {err}");
         }
@@ -191,6 +214,7 @@ fn run(nested: bool) -> anyhow::Result<()> {
         let _ = child.kill();
     }
     let _ = std::fs::remove_file(&ipc_path);
+    let _ = std::fs::remove_file(&bar_path);
     Ok(())
 }
 
@@ -228,6 +252,7 @@ fn start_systemd_session(state: &State) {
         "XDG_SESSION_DESKTOP",
         "XDG_SESSION_TYPE",
         "PZWM_SOCKET",
+        "UMBRIEL_SOCKET",
         "XCURSOR_THEME",
         "XCURSOR_SIZE",
     ];

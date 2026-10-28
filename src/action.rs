@@ -42,6 +42,10 @@ pub enum Action {
     /// Keep the window fixed on screen while the canvas moves under it.
     TogglePin,
     CenterWindow,
+    /// `profile save|load NAME`: desktop profiles, see profiles.rs.
+    Profile(String),
+    /// Center the window and zoom so it fills the visible area.
+    FitWindow,
     FocusDir(Dir),
     FocusNext,
     FocusPrev,
@@ -56,6 +60,10 @@ pub enum Action {
     /// Zoom out so every window of the workspace is visible.
     Overview,
     Home,
+    /// Show or hide the workspace minimap.
+    ToggleMinimap,
+    /// Jump to the n-th window (0-based) in the order windows were opened.
+    FocusNth(usize),
     Workspace(usize),
     MoveToWorkspace(usize),
     NextLayout,
@@ -81,6 +89,8 @@ impl Action {
             "fullscreen" | "toggle-fullscreen" => Self::ToggleFullscreen,
             "pin" | "toggle-pin" => Self::TogglePin,
             "center" | "center-window" => Self::CenterWindow,
+            "fit" | "fit-window" => Self::FitWindow,
+            "profile" if !arg.is_empty() => Self::Profile(arg.to_string()),
             "focus" => match arg {
                 "next" => Self::FocusNext,
                 "prev" | "previous" => Self::FocusPrev,
@@ -95,6 +105,8 @@ impl Action {
             "zoom-reset" => Self::ZoomReset,
             "overview" | "zoom-fit" => Self::Overview,
             "home" => Self::Home,
+            "minimap" | "toggle-minimap" => Self::ToggleMinimap,
+            "window" => Self::FocusNth(num().filter(|n| (1..=10).contains(n))? - 1),
             "workspace" => Self::Workspace(num().filter(|n| (1..=10).contains(n))? - 1),
             "move-to-workspace" => {
                 Self::MoveToWorkspace(num().filter(|n| (1..=10).contains(n))? - 1)
@@ -122,6 +134,8 @@ mod tests {
             Some(Action::Spawn("ghostty +new-window".into()))
         );
         assert_eq!(Action::parse("workspace 1"), Some(Action::Workspace(0)));
+        assert_eq!(Action::parse("window 10"), Some(Action::FocusNth(9)));
+        assert_eq!(Action::parse("window 0"), None);
         assert_eq!(
             Action::parse("move-to-workspace 10"),
             Some(Action::MoveToWorkspace(9))

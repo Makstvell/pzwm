@@ -54,7 +54,9 @@ use tracing::{error, info, warn};
 use super::Backend;
 use crate::{
     config::{Config, Input as InputConfig},
-    render::{PzElement, PzRenderer, output_elements, post_render},
+    render::{
+        PzElement, PzRenderer, mirror_scale, output_elements, post_render, scaled_output_elements,
+    },
     state::{RedrawState, State, output_state},
 };
 
@@ -68,6 +70,9 @@ type OutputManager = DrmOutputManager<
 >;
 type DrmOut =
     DrmOutput<GbmAllocator<DrmDeviceFd>, GbmFramebufferExporter<DrmDeviceFd>, (), DrmDeviceFd>;
+
+/// How long a removed output's global stays disabled before it is destroyed.
+const OUTPUT_GLOBAL_GRACE: Duration = Duration::from_secs(5);
 
 /// 8-bit formats only: 10-bit trips up some drivers and gains little here.
 const COLOR_FORMATS: [Fourcc; 2] = [Fourcc::Argb8888, Fourcc::Abgr8888];
@@ -560,8 +565,18 @@ fn connector_connected(
             model: name.clone(),
         },
     );
-    let scale = output_config.scale.unwrap_or(1.0).clamp(0.5, 4.0);
-    let _global = output.create_global::<State>(&state.display_handle);
+    let mirror_of = output_config
+        .mirror
+        .clone()
+        .filter(|source| source != &name);
+    let scale = state.config.output_scale(&name);
+    // A mirror is invisible to clients: no bar, no windows of its own.
+    if mirror_of.is_none() {
+        let global = output.create_global::<State>(&state.display_handle);
+        output
+            .user_data()
+            .insert_if_missing(|| OutputGlobal(global));
+    }
     output.set_preferred(wl_mode);
     output.change_current_state(Some(wl_mode), None, Some(Scale::Fractional(scale)), None);
     output
@@ -620,12 +635,20 @@ fn connector_connected(
         },
     );
 
-    let position = output_config
-        .position
-        .as_deref()
-        .and_then(|p| p.split_once(','))
-        .and_then(|(x, y)| Some((x.trim().parse::<i32>().ok()?, y.trim().parse::<i32>().ok()?)));
-    let position = position.unwrap_or_else(|| {
+    if let Some(source) = mirror_of {
+        info!(
+            "output {name}: {}x{} mirrors {source}",
+            wl_mode.size.w, wl_mode.size.h
+        );
+        state.mirrors.push(crate::state::Mirror {
+            output: output.clone(),
+            source,
+        });
+        queue_redraw(state, &output);
+        return;
+    }
+
+    let position = output_config.position().unwrap_or_else(|| {
         let right = state
             .outputs
             .iter()
@@ -671,8 +694,33 @@ fn connector_disconnected(state: &mut State, node: DrmNode, crtc: crtc::Handle) 
             state.loop_handle.remove(token);
         }
         state.outputs.retain(|o| o != &surface.output);
+        state.mirrors.retain(|m| m.output != surface.output);
+        state.mirror_caches.remove(&surface.output.name());
+        crate::screencopy::fail_output(state, &surface.output);
+        remove_output_global(state, &surface.output);
         state.render_cache_drop_output(&surface.output);
     }
+}
+
+/// The `wl_output` global of an output, kept so it can be withdrawn when the
+/// monitor goes away (otherwise clients keep seeing, and capturing, a ghost).
+struct OutputGlobal(smithay::reexports::wayland_server::backend::GlobalId);
+
+/// Disables the global now and destroys it a little later, giving clients
+/// time to see the removal before the object goes away.
+fn remove_output_global(state: &mut State, output: &Output) {
+    let Some(OutputGlobal(id)) = output.user_data().get::<OutputGlobal>() else {
+        return;
+    };
+    let id = id.clone();
+    state.display_handle.disable_global::<State>(id.clone());
+    let _ = state.loop_handle.insert_source(
+        Timer::from_duration(OUTPUT_GLOBAL_GRACE),
+        move |_, _, state| {
+            state.display_handle.remove_global::<State>(id.clone());
+            TimeoutAction::Drop
+        },
+    );
 }
 
 fn find_surface<'a>(
@@ -751,9 +799,13 @@ fn render(state: &mut State, output: &Output) {
         // Session inactive or a hard error: wait for the next activation.
         None => output_state(output).redraw = RedrawState::Idle,
     }
-    post_render(state, output);
+    // Frame callbacks and captures belong to the source output.
+    if state.mirror_source(output).is_none() {
+        post_render(state, output);
+    }
+    // Through State so the output's mirrors repaint too.
     if std::mem::take(&mut output_state(output).redraw_pending) {
-        queue_redraw(state, output);
+        state.queue_redraw(output);
     }
     state.popups.cleanup();
     let _ = state.display_handle.flush_clients();
@@ -777,7 +829,24 @@ fn render_inner(state: &mut State, data: &mut UdevData, output: &Output) -> Opti
     .inspect_err(|err| warn!("no renderer for {}: {err}", output.name()))
     .ok()?;
 
-    let (elements, clear) = output_elements(state, &mut renderer, output);
+    let (elements, clear) = match state.mirror_source(output) {
+        None => output_elements(state, &mut renderer, output),
+        Some(Some(source)) => {
+            let size = output.current_mode().map(|m| m.size).unwrap_or_default();
+            let os = mirror_scale(size, state.output_geometry(&source).size);
+            let own = state
+                .mirror_caches
+                .remove(&output.name())
+                .unwrap_or_default();
+            let source_cache = std::mem::replace(&mut state.render_cache, own);
+            let drawn = scaled_output_elements(state, &mut renderer, &source, os);
+            let own = std::mem::replace(&mut state.render_cache, source_cache);
+            state.mirror_caches.insert(output.name(), own);
+            drawn
+        }
+        // The source is unplugged: black.
+        Some(None) => (Vec::new(), [0.0, 0.0, 0.0, 1.0]),
+    };
     let damaged =
         match surface
             .drm_output
@@ -790,7 +859,7 @@ fn render_inner(state: &mut State, data: &mut UdevData, output: &Output) -> Opti
             }
         };
     drop(elements);
-    if !state.pending_copies.is_empty() {
+    if !state.pending_copies.is_empty() && state.mirror_source(output).is_none() {
         crate::screencopy::process(state, renderer.as_mut(), output);
     }
     match damaged? {
@@ -838,8 +907,16 @@ fn vblank(state: &mut State, output: &Output, real: bool) {
         _ => false,
     };
     output_state(output).redraw = RedrawState::Idle;
+    // A mirror follows its source, which queues it whenever it redraws.
+    if state.mirror_source(output).is_some() {
+        if queued {
+            queue_redraw(state, output);
+        }
+        return;
+    }
+    // Through State so mirrors follow animations frame by frame.
     if queued || state.is_animating(output) || state.interaction.is_some() {
-        queue_redraw(state, output);
+        state.queue_redraw(output);
     }
 }
 

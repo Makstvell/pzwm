@@ -179,6 +179,19 @@ impl Dispatch<ZwlrScreencopyFrameV1, Option<FrameData>> for State {
     }
 }
 
+/// Fails copies still waiting on an output that just went away, so capture
+/// clients (the portal, grim) give up instead of waiting forever.
+pub fn fail_output(state: &mut State, output: &Output) {
+    state.pending_copies.retain(|p| {
+        if &p.output == output {
+            p.frame.failed();
+            false
+        } else {
+            true
+        }
+    });
+}
+
 /// Serves pending copies for `output` with a fresh render into a texture.
 pub fn process(state: &mut State, renderer: &mut GlesRenderer, output: &Output) {
     let (mine, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut state.pending_copies)
@@ -249,12 +262,16 @@ fn copy_one(
         let dst = unsafe { std::slice::from_raw_parts_mut(ptr.add(offset), stride * h) };
         let full_w = mode.w as usize;
         let full_h = mode.h as usize;
+        // On DRM outputs the readback is already top-down. The nested
+        // (winit) output is y-up (Flipped180), so its rows come out reversed.
+        let bottom_up = output.current_transform() == Transform::Flipped180;
         for y in 0..h {
-            // GL reads textures bottom-up: flip rows while cropping.
-            let src_y = full_h - 1 - (r.loc.y as usize + y);
-            for x in 0..w {
-                let s = &pixels[(src_y * full_w + r.loc.x as usize + x) * 4..][..4];
-                let d = &mut dst[y * stride + x * 4..][..4];
+            let row = r.loc.y as usize + y;
+            let src_y = if bottom_up { full_h - 1 - row } else { row };
+            let src_start = (src_y * full_w + r.loc.x as usize) * 4;
+            let src = &pixels[src_start..src_start + w * 4];
+            let dst_row = &mut dst[y * stride..y * stride + w * 4];
+            for (d, s) in dst_row.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
                 // RGBA (GL) -> BGRA (wl_shm ARGB8888, little endian)
                 d.copy_from_slice(&[s[2], s[1], s[0], s[3]]);
             }

@@ -23,6 +23,7 @@ use smithay::{
 use crate::{
     action::Dir,
     canvas::snap_position,
+    minimap::MapLayout,
     shell::{Placement, ResizeAnchor},
     state::State,
 };
@@ -43,6 +44,8 @@ pub enum Interaction {
         /// Cursor position relative to the content top-left, window units.
         offset: Point<f64, Logical>,
     },
+    /// Dragging the view rectangle around the minimap.
+    MapDrag { output: Output, layout: MapLayout },
     Resize {
         id: u64,
         edges: ResizeEdge,
@@ -96,6 +99,16 @@ pub fn start_pan(state: &mut State, serial: Serial, button: u32) {
         CursorIcon::Grabbing,
         serial,
         button,
+    );
+}
+
+pub fn start_map_drag(state: &mut State, output: Output, layout: MapLayout, serial: Serial) {
+    begin(
+        state,
+        Interaction::MapDrag { output, layout },
+        CursorIcon::Grabbing,
+        serial,
+        0x110,
     );
 }
 
@@ -193,15 +206,33 @@ pub fn start_resize_with_button(
     begin(state, interaction, edge_icon(edges), serial, button);
 }
 
-/// Picks the resize edge for Super+right-drag from where the window was grabbed.
+/// Picks the resize edge for the resize mouse bind from where the window was
+/// grabbed: outer thirds pick that side, corners resize diagonally, the
+/// middle resizes the bottom-right corner.
 pub fn nearest_edges(local: Point<f64, Logical>, size: Size<f64, Logical>) -> ResizeEdge {
-    let left = local.x < size.w / 2.0;
-    let top = local.y < size.h / 2.0;
-    match (left, top) {
-        (true, true) => ResizeEdge::TopLeft,
-        (true, false) => ResizeEdge::BottomLeft,
-        (false, true) => ResizeEdge::TopRight,
-        (false, false) => ResizeEdge::BottomRight,
+    let horizontal = if local.x < size.w / 3.0 {
+        Some(true)
+    } else if local.x > size.w * 2.0 / 3.0 {
+        Some(false)
+    } else {
+        None
+    };
+    let vertical = if local.y < size.h / 3.0 {
+        Some(true)
+    } else if local.y > size.h * 2.0 / 3.0 {
+        Some(false)
+    } else {
+        None
+    };
+    match (horizontal, vertical) {
+        (Some(true), Some(true)) => ResizeEdge::TopLeft,
+        (Some(true), Some(false)) => ResizeEdge::BottomLeft,
+        (Some(false), Some(true)) => ResizeEdge::TopRight,
+        (Some(true), None) => ResizeEdge::Left,
+        (Some(false), None) => ResizeEdge::Right,
+        (None, Some(true)) => ResizeEdge::Top,
+        (None, Some(false)) => ResizeEdge::Bottom,
+        (Some(false), Some(false)) | (None, None) => ResizeEdge::BottomRight,
     }
 }
 
@@ -223,6 +254,11 @@ impl State {
             Interaction::Move { id, offset } => {
                 self.drag_window(id, offset);
                 Interaction::Move { id, offset }
+            }
+            Interaction::MapDrag { output, layout } => {
+                let local = self.cursor_local(&output);
+                self.minimap_jump(&output, &layout, local, false);
+                Interaction::MapDrag { output, layout }
             }
             Interaction::Resize {
                 id,
@@ -407,6 +443,7 @@ impl State {
                     );
                 }
             }
+            Some(Interaction::MapDrag { .. }) => self.map_drag_ended(),
             Some(Interaction::Pan { .. }) | None => {}
         }
         // We are inside the pointer's grab callback: touching the pointer
@@ -552,6 +589,23 @@ impl PointerGrab<State> for CompositorGrab {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nearest_edges_picks_side_in_the_middle_thirds() {
+        let size = Size::from((300.0, 300.0));
+        assert_eq!(
+            nearest_edges(Point::from((10.0, 150.0)), size),
+            ResizeEdge::Left
+        );
+        assert_eq!(
+            nearest_edges(Point::from((150.0, 290.0)), size),
+            ResizeEdge::Bottom
+        );
+        assert_eq!(
+            nearest_edges(Point::from((150.0, 150.0)), size),
+            ResizeEdge::BottomRight
+        );
+    }
 
     #[test]
     fn nearest_edges_picks_quadrant() {

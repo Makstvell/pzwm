@@ -164,6 +164,37 @@ void main() {
 }
 "#;
 
+/// Filled rounded rectangle with an inner stroke (minimap panel and items).
+const RECT_FRAG: &str = r#"
+varying vec2 v_coords;
+uniform vec2 size;
+uniform float alpha;
+#if defined(DEBUG_FLAGS)
+uniform float tint;
+#endif
+uniform vec4 u_fill;      // straight (non-premultiplied) colors
+uniform vec4 u_stroke;
+uniform float u_radius;   // physical pixels
+uniform float u_border;
+
+void main() {
+    vec2 half_size = size * 0.5;
+    vec2 q = v_coords * size - half_size;
+    float r = min(u_radius, min(half_size.x, half_size.y));
+    vec2 k = abs(q) - half_size + r;
+    float d = min(max(k.x, k.y), 0.0) + length(max(k, 0.0)) - r;
+    float inside = 1.0 - smoothstep(-0.5, 0.5, d);
+    float inner = 1.0 - smoothstep(-0.5, 0.5, d + u_border);
+    vec4 fill = vec4(u_fill.rgb * u_fill.a, u_fill.a);
+    vec4 stroke = vec4(u_stroke.rgb * u_stroke.a, u_stroke.a);
+    vec4 col = mix(stroke, fill, inner) * inside;
+#if defined(DEBUG_FLAGS)
+    if (tint == 1.0) col = vec4(0.0, 0.2, 0.0, 0.2) + col * 0.8;
+#endif
+    gl_FragColor = col * alpha;
+}
+"#;
+
 /// Texture shader that cuts rounded corners out of client surfaces.
 const CLIP_FRAG: &str = r#"
 //_DEFINES_
@@ -214,6 +245,7 @@ void main() {
 pub struct Shaders {
     pub grid: GlesPixelProgram,
     pub frame: GlesPixelProgram,
+    pub rect: GlesPixelProgram,
     pub clip: GlesTexProgram,
 }
 
@@ -267,11 +299,25 @@ impl Shaders {
                 u("u_mode", _1f),
             ],
         )?;
+        let rect = renderer.compile_custom_pixel_shader(
+            format!("{PRECISION}{RECT_FRAG}"),
+            &[
+                u("u_fill", _4f),
+                u("u_stroke", _4f),
+                u("u_radius", _1f),
+                u("u_border", _1f),
+            ],
+        )?;
         let clip = renderer.compile_custom_texture_shader(
             CLIP_FRAG,
             &[u("u_uv_to_px", _4f), u("u_clip", _4f), u("u_radii", _2f)],
         )?;
-        Ok(Shaders { grid, frame, clip })
+        Ok(Shaders {
+            grid,
+            frame,
+            rect,
+            clip,
+        })
     }
 }
 
@@ -447,6 +493,9 @@ pub struct ClippedSurface<R: smithay::backend::renderer::Renderer> {
     tex_size: Option<Size<i32, Buffer>>,
     clip: Clip,
     program: GlesTexProgram,
+    /// Own identity when the surface is drawn a second time (minimap
+    /// preview), so damage tracking keeps the two copies apart.
+    id: Option<Id>,
 }
 
 impl<R: PzRenderer> ClippedSurface<R> {
@@ -461,13 +510,21 @@ impl<R: PzRenderer> ClippedSurface<R> {
             tex_size,
             clip,
             program,
+            id: None,
+        }
+    }
+
+    pub fn with_id(self, id: Id) -> Self {
+        Self {
+            id: Some(id),
+            ..self
         }
     }
 }
 
 impl<R: PzRenderer> Element for ClippedSurface<R> {
     fn id(&self) -> &Id {
-        self.inner.id()
+        self.id.as_ref().unwrap_or_else(|| self.inner.id())
     }
     fn current_commit(&self) -> CommitCounter {
         self.inner.current_commit()

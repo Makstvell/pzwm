@@ -17,11 +17,29 @@ use smithay::{
     wayland::{
         compositor::with_states,
         seat::WaylandFocus,
-        shell::wlr_layer::{KeyboardInteractivity, Layer, LayerSurfaceCachedState},
+        shell::{
+            wlr_layer::{KeyboardInteractivity, Layer, LayerSurfaceCachedState},
+            xdg::{SurfaceCachedState, XdgToplevelSurfaceData},
+        },
     },
 };
 
 use crate::{canvas::ease_out, config::Config, state::State};
+
+/// `share` (clamped to 0.1 .. 1.0) of `len`, kept within the client's
+/// `min`/`max` size; a `max` of 0 means no limit.
+fn share_of(len: f64, share: f64, min: i32, max: i32) -> i32 {
+    let want = ((len * share.clamp(0.1, 1.0)).round() as i32)
+        .max(min)
+        .max(1);
+    if max > 0 { want.min(max) } else { want }
+}
+
+pub struct CanvasGeometry {
+    pub ws: usize,
+    pub pos: Point<f64, Logical>,
+    pub size: Size<i32, Logical>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Placement {
@@ -154,7 +172,6 @@ pub enum Hit {
 }
 
 /// Screen-space margin around windows that grabs resize.
-const RESIZE_MARGIN: f64 = 8.0;
 const CASCADE_STEP: f64 = 32.0;
 const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 
@@ -325,7 +342,8 @@ impl State {
         if matches!(m.placement, Placement::Maximized | Placement::Fullscreen) {
             return None;
         }
-        let margin = RESIZE_MARGIN / view.scale;
+        let margin = self.config.canvas.resize_margin.max(1.0) / view.scale;
+        let corner = self.config.canvas.resize_corner.max(0.0) / view.scale;
         let (left, right) = (
             p.x < 0.0 && p.x >= -margin,
             p.x >= size.w && p.x < size.w + margin,
@@ -336,15 +354,26 @@ impl State {
         );
         let in_x = p.x >= -margin && p.x < size.w + margin;
         let in_y = p.y >= -title - margin && p.y < size.h + margin;
-        let edge = match (left, right, top, bottom) {
+        if !in_x || !in_y {
+            return None;
+        }
+        // Near a corner the side zones resize diagonally, so corners are
+        // easy to catch without pixel hunting.
+        let side_x = left || right;
+        let side_y = top || bottom;
+        let west = left || (side_y && p.x < corner);
+        let east = right || (side_y && p.x >= size.w - corner);
+        let north = top || (side_x && p.y < -title + corner);
+        let south = bottom || (side_x && p.y >= size.h - corner);
+        let edge = match (west, east, north, south) {
             (true, _, true, _) => ResizeEdge::TopLeft,
             (true, _, _, true) => ResizeEdge::BottomLeft,
             (_, true, true, _) => ResizeEdge::TopRight,
             (_, true, _, true) => ResizeEdge::BottomRight,
-            (true, ..) if in_y => ResizeEdge::Left,
-            (_, true, ..) if in_y => ResizeEdge::Right,
-            (_, _, true, _) if in_x => ResizeEdge::Top,
-            (_, _, _, true) if in_x => ResizeEdge::Bottom,
+            (true, ..) => ResizeEdge::Left,
+            (_, true, ..) => ResizeEdge::Right,
+            (_, _, true, _) => ResizeEdge::Top,
+            (_, _, _, true) => ResizeEdge::Bottom,
             _ => return None,
         };
         Some(Hit::Edge(edge))
@@ -376,6 +405,67 @@ impl State {
                 anchor: None,
             },
         );
+    }
+
+    pub fn app_id(&self, m: &Managed) -> Option<String> {
+        let toplevel = m.window.toplevel()?;
+        with_states(toplevel.wl_surface(), |states| {
+            states
+                .data_map
+                .get::<XdgToplevelSurfaceData>()
+                .and_then(|d| d.lock().ok().and_then(|d| d.app_id.clone()))
+        })
+    }
+
+    /// Where a window sits on the canvas; for a maximized one, the place it
+    /// returns to.
+    pub fn canvas_geometry(&self, idx: usize) -> Option<CanvasGeometry> {
+        let m = &self.windows[idx];
+        match m.placement {
+            Placement::Canvas => Some(CanvasGeometry {
+                ws: m.ws,
+                pos: m.pos,
+                size: m.window.geometry().size,
+            }),
+            Placement::Maximized => {
+                let r = m.restore.as_ref()?;
+                Some(CanvasGeometry {
+                    ws: r.ws,
+                    pos: r.pos,
+                    size: r.size,
+                })
+            }
+            Placement::Pinned | Placement::Fullscreen => None,
+        }
+    }
+
+    /// Size a new window is asked to open at, so every app starts the same
+    /// instead of at whatever it remembered. `None` leaves the choice to the
+    /// app: dialogs and fixed-size windows.
+    pub fn initial_size(&self, idx: usize) -> Option<Size<i32, Logical>> {
+        let m = &self.windows[idx];
+        let toplevel = m.window.toplevel()?;
+        if toplevel.parent().is_some() {
+            return None;
+        }
+        let (min, max) = with_states(toplevel.wl_surface(), |states| {
+            let mut cached = states.cached_state.get::<SurfaceCachedState>();
+            let current = cached.current();
+            (current.min_size, current.max_size)
+        });
+        if max.w > 0 && max.h > 0 && min == max {
+            return None;
+        }
+        if let Some(size) = self.app_id(m).and_then(|a| self.profile_size(&a)) {
+            return Some(size);
+        }
+        let area = self.usable_area(&self.active_output()?).size.to_f64();
+        let canvas = &self.config.canvas;
+        let title = self.title_height(m);
+        Some(Size::from((
+            share_of(area.w, canvas.new_window_width, min.w, max.w),
+            share_of(area.h - title, canvas.new_window_height, min.h, max.h),
+        )))
     }
 
     /// First buffer arrived: choose a spot in view and focus the window.
@@ -413,7 +503,8 @@ impl State {
         m.pos = pos;
         m.mapped = true;
         m.opened_at = Some(Instant::now());
-        let window = m.window.clone();
+        self.place_from_profile(idx);
+        let window = self.windows[idx].window.clone();
         self.focus_window(Some(window));
         self.queue_redraw_all();
     }
@@ -444,6 +535,9 @@ impl State {
             }
         }
         self.render_cache.forget(removed.id);
+        for cache in self.mirror_caches.values_mut() {
+            cache.forget(removed.id);
+        }
         if self.focused.as_ref() == Some(window) {
             self.focused = None;
             let ws = self
@@ -764,5 +858,27 @@ impl State {
     pub fn open_effect(&self, m: &Managed, now: Instant) -> (f64, f32) {
         let t = ease_out(m.anim_progress(now, &self.config));
         (0.94 + 0.06 * t, (0.15 + 0.85 * t) as f32)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::share_of;
+
+    #[test]
+    fn share_of_takes_fraction_of_screen() {
+        assert_eq!(share_of(1000.0, 0.6, 0, 0), 600);
+    }
+
+    #[test]
+    fn share_of_respects_client_limits() {
+        assert_eq!(share_of(1000.0, 0.6, 800, 0), 800);
+        assert_eq!(share_of(1000.0, 0.6, 0, 400), 400);
+    }
+
+    #[test]
+    fn share_of_clamps_bad_fractions() {
+        assert_eq!(share_of(1000.0, 5.0, 0, 0), 1000);
+        assert_eq!(share_of(1000.0, 0.0, 0, 0), 100);
     }
 }

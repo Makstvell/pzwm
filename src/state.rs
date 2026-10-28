@@ -179,6 +179,8 @@ pub struct State {
     pub hover: Option<crate::shell::Hover>,
     pub last_title_click: Option<(u64, Instant)>,
     pub snap_preview: Option<(Output, Rectangle<f64, Logical>)>,
+    /// The minimap called up at the cursor (`position = "cursor"`).
+    pub map_popup: Option<crate::minimap::MapPopup>,
     pub swipe: Option<Point<f64, Logical>>,
     /// Middle press over a window, not yet known to be a click or a pan.
     pub pending_middle: Option<(Point<f64, Logical>, u32)>,
@@ -187,6 +189,9 @@ pub struct State {
     /// Camera to return to when the overview is toggled off.
     pub pre_overview: Option<(usize, Camera)>,
     pub pinch: Option<f64>,
+    /// When the last canvas scroll happened; scrolling keeps moving the
+    /// canvas until a short pause even if a window slides under the cursor.
+    pub scroll_latch: Option<Instant>,
 
     pub lock: LockState,
     pub lock_surfaces: HashMap<String, LockSurface>,
@@ -195,8 +200,23 @@ pub struct State {
     /// Off while rendering a screenshot that asked not to include the cursor.
     pub render_cursor: bool,
     pub pending_copies: Vec<crate::screencopy::PendingCopy>,
+    pub bar: crate::bar::BarFeed,
+    /// Outputs showing a copy of another output (`mirror` in the config).
+    /// They are not in `outputs`: no workspace, bar or cursor of their own.
+    pub mirrors: Vec<Mirror>,
+    /// Each mirror's own render cache, so drawing the source at another
+    /// scale does not make its cached elements look changed on every frame.
+    pub mirror_caches: HashMap<String, RenderCache>,
+    pub profile_pending: crate::profiles::PendingPlacements,
     pub xwayland_display: Option<String>,
     pub children: Vec<std::process::Child>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Mirror {
+    pub output: Output,
+    /// Name of the output it shows.
+    pub source: String,
 }
 
 impl State {
@@ -332,17 +352,23 @@ impl State {
             hover: None,
             last_title_click: None,
             snap_preview: None,
+            map_popup: None,
             swipe: None,
             pending_middle: None,
             suppressed_keys: Vec::new(),
             pre_overview: None,
             pinch: None,
+            scroll_latch: None,
             lock: LockState::default(),
             lock_surfaces: HashMap::new(),
             idle_inhibitors: Vec::new(),
             render_cache: RenderCache::default(),
             render_cursor: true,
             pending_copies: Vec::new(),
+            bar: Default::default(),
+            mirrors: Vec::new(),
+            mirror_caches: HashMap::new(),
+            profile_pending: Default::default(),
             xwayland_display: None,
             children: Vec::new(),
         })
@@ -459,6 +485,18 @@ impl State {
 
     pub fn queue_redraw(&mut self, output: &Output) {
         crate::backend::queue_redraw(self, output);
+        let name = output.name();
+        for mirror in self.mirrors.clone() {
+            if mirror.source == name {
+                crate::backend::queue_redraw(self, &mirror.output);
+            }
+        }
+    }
+
+    /// The output a mirror copies, when `output` is a mirror.
+    pub fn mirror_source(&self, output: &Output) -> Option<Option<Output>> {
+        let mirror = self.mirrors.iter().find(|m| &m.output == output)?;
+        Some(self.output_by_name(&mirror.source))
     }
 
     pub fn queue_redraw_all(&mut self) {
@@ -477,7 +515,7 @@ impl State {
                 .windows
                 .iter()
                 .any(|w| w.anim_progress(now, &self.config) < 1.0);
-        camera_moving || window_anim
+        camera_moving || window_anim || self.map_popup_fading(now)
     }
 
     // ---- processes ---------------------------------------------------------
@@ -494,6 +532,10 @@ impl State {
             .env(
                 "PZWM_SOCKET",
                 crate::ipc::socket_path(&self.socket_name.to_string_lossy()),
+            )
+            .env(
+                "UMBRIEL_SOCKET",
+                crate::bar::socket_path(&self.socket_name.to_string_lossy()),
             )
             .stdin(Stdio::null());
         match &self.xwayland_display {

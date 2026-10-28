@@ -105,11 +105,11 @@ impl CompositorHandler for State {
         on_commit_buffer_handler::<Self>(surface);
         crate::backend::early_import(self, surface);
 
+        let mut root = surface.clone();
+        while let Some(parent) = get_parent(&root) {
+            root = parent;
+        }
         if !is_sync_subsurface(surface) {
-            let mut root = surface.clone();
-            while let Some(parent) = get_parent(&root) {
-                root = parent;
-            }
             if let Some(idx) = self.index_of_surface(&root) {
                 self.windows[idx].window.on_commit();
                 if &root == surface {
@@ -120,11 +120,45 @@ impl CompositorHandler for State {
 
         self.popups.commit(surface);
         self.ensure_initial_configure(surface);
-        self.queue_redraw_all();
+        match self.commit_targets(&root) {
+            Some(outputs) => outputs.iter().for_each(|o| self.queue_redraw(o)),
+            None => self.queue_redraw_all(),
+        }
     }
 }
 
 impl State {
+    /// Outputs that show `root` (a window or a layer surface), so a commit
+    /// only repaints those. `None`: not known, repaint everything.
+    fn commit_targets(&self, root: &WlSurface) -> Option<Vec<Output>> {
+        if let Some(idx) = self.index_of_surface(root) {
+            let m = &self.windows[idx];
+            if !m.mapped {
+                return None;
+            }
+            let shown: Vec<Output> = self
+                .outputs
+                .iter()
+                .filter(|o| self.view(m, o).is_some())
+                .cloned()
+                .collect();
+            // Hidden windows still need the slow frame tick of the first output.
+            return Some(if shown.is_empty() {
+                self.outputs.first().cloned().into_iter().collect()
+            } else {
+                shown
+            });
+        }
+        self.outputs
+            .iter()
+            .find(|o| {
+                layer_map_for_output(o)
+                    .layer_for_surface(root, WindowSurfaceType::TOPLEVEL)
+                    .is_some()
+            })
+            .map(|o| vec![o.clone()])
+    }
+
     fn window_committed(&mut self, idx: usize) {
         let Some(surface) = self.windows[idx].wl_surface() else {
             return;
@@ -175,6 +209,9 @@ impl State {
                         .is_some_and(|d| d.lock().is_ok_and(|d| d.initial_configure_sent))
                 });
                 if !sent {
+                    if let Some(size) = self.initial_size(idx) {
+                        toplevel.with_pending_state(|s| s.size = Some(size));
+                    }
                     toplevel.send_configure();
                 }
             }

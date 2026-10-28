@@ -39,6 +39,31 @@ impl State {
         self.queue_redraw(&output);
     }
 
+    /// Centers a canvas window and zooms so it fills the visible area.
+    pub fn fit_window(&mut self, idx: usize) {
+        let m = &self.windows[idx];
+        if m.placement != Placement::Canvas {
+            return;
+        }
+        let Some(output) = self
+            .outputs
+            .iter()
+            .find(|o| self.output_ws(o) == m.ws)
+            .cloned()
+        else {
+            return;
+        };
+        let frame = self.canvas_frame(m);
+        let area = self.usable_area(&output).to_f64();
+        let ws = m.ws;
+        let canvas = &self.config.canvas;
+        let margin = self.config.appearance.gaps as f64;
+        let cam = Camera::fitting(frame, area, margin, canvas.min_zoom, canvas.max_zoom);
+        let dur = self.camera_duration();
+        self.workspace_mut(ws).animate_to(cam, dur, Instant::now());
+        self.queue_redraw(&output);
+    }
+
     /// Pans just enough to bring a canvas window fully into view.
     pub fn reveal(&mut self, idx: usize) {
         let m = &self.windows[idx];
@@ -129,9 +154,11 @@ impl State {
     }
 
     /// Alt+Tab: next window of this workspace (by age), centered on screen.
-    pub fn focus_cycle(&mut self, forward: bool) {
+    /// Ids of the active workspace's windows (and pinned ones) in the order
+    /// they were opened.
+    fn launch_order(&self) -> Vec<u64> {
         let Some(output) = self.active_output() else {
-            return;
+            return Vec::new();
         };
         let ws = self.output_ws(&output);
         let mut ids: Vec<u64> = self
@@ -140,10 +167,31 @@ impl State {
             .filter(|m| m.mapped && (m.ws == ws || m.placement == Placement::Pinned))
             .map(|m| m.id)
             .collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    fn focus_and_center(&mut self, id: u64) {
+        if let Some(i) = self.index_of_id(id) {
+            let window = self.windows[i].window.clone();
+            self.focus_window(Some(window));
+            self.center_on(0);
+        }
+    }
+
+    /// Jumps to the `n`-th window (0-based) in launch order, like clicking
+    /// it on the minimap.
+    pub fn focus_nth(&mut self, n: usize) {
+        if let Some(&id) = self.launch_order().get(n) {
+            self.focus_and_center(id);
+        }
+    }
+
+    pub fn focus_cycle(&mut self, forward: bool) {
+        let ids = self.launch_order();
         if ids.is_empty() {
             return;
         }
-        ids.sort_unstable();
         let current = self.focused_index().map(|i| self.windows[i].id);
         let pos = current.and_then(|c| ids.iter().position(|&id| id == c));
         let next = match (pos, forward) {
@@ -151,11 +199,7 @@ impl State {
             (Some(p), false) => ids[(p + ids.len() - 1) % ids.len()],
             (None, _) => ids[0],
         };
-        if let Some(i) = self.index_of_id(next) {
-            let window = self.windows[i].window.clone();
-            self.focus_window(Some(window));
-            self.center_on(0);
-        }
+        self.focus_and_center(next);
     }
 
     // ---- camera commands ---------------------------------------------------

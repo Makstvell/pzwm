@@ -1,8 +1,12 @@
 //! Pointer and touchpad input: focus, canvas gestures, window dragging.
 //! Keyboard handling lives in `bindings.rs`.
 
+use std::time::{Duration, Instant};
+
 use crate::{
+    config::{MouseAction, MouseTrigger},
     grabs,
+    minimap::MapHit,
     shell::{Hit, Hover, Placement},
     state::State,
 };
@@ -31,6 +35,20 @@ use smithay::{
 pub const BTN_LEFT: u32 = 0x110;
 pub const BTN_RIGHT: u32 = 0x111;
 pub const BTN_MIDDLE: u32 = 0x112;
+pub const BTN_BACK: u32 = 0x113;
+pub const BTN_FORWARD: u32 = 0x114;
+
+/// Pause after which a canvas scroll lets go and windows get the wheel again.
+const SCROLL_LATCH: Duration = Duration::from_millis(350);
+
+/// Who handles a scroll that does not go to a client.
+#[derive(Clone, Copy)]
+enum ScrollMode {
+    /// A `[mouse]` scroll bind: works anywhere, also over windows.
+    Bind(MouseAction),
+    /// Scrolling the empty canvas (or continuing such a scroll).
+    Canvas,
+}
 
 /// What the pointer is over.
 pub enum Under {
@@ -47,6 +65,8 @@ pub enum Under {
         window: usize,
         hit: Hit,
     },
+    /// The workspace minimap.
+    Minimap,
     Empty,
 }
 
@@ -127,7 +147,10 @@ impl State {
                 self.notify_activity();
                 let canvas_gesture = !self.lock.is_locked()
                     && (self.super_held()
-                        || matches!(self.under(), Under::Empty | Under::Decoration { .. }));
+                        || matches!(
+                            self.under(),
+                            Under::Empty | Under::Decoration { .. } | Under::Minimap
+                        ));
                 if canvas_gesture {
                     self.pinch = Some(1.0);
                 } else {
@@ -193,6 +216,16 @@ impl State {
         self.seat
             .get_keyboard()
             .is_some_and(|k| k.modifier_state().logo)
+    }
+
+    /// The `[mouse]` bind for `trigger` with the modifiers held right now.
+    fn mouse_bind(&self, trigger: MouseTrigger) -> Option<MouseAction> {
+        let mods = self
+            .seat
+            .get_keyboard()
+            .map(|k| crate::config::Mods::from_state(&k.modifier_state()))
+            .unwrap_or_default();
+        self.config.mouse_bind(mods, trigger)
     }
 
     // ---- pointer -----------------------------------------------------------
@@ -333,6 +366,7 @@ impl State {
                 }
             }
             Under::Empty => (None, Some(CursorIcon::Default)),
+            Under::Minimap => (None, Some(CursorIcon::Pointer)),
             Under::Surface { .. } => (None, None),
         };
         if self.interaction.is_none() {
@@ -383,6 +417,12 @@ impl State {
             if let Some(under) = self.layer_under(&output, Layer::Top, local) {
                 return under;
             }
+            if self
+                .minimap_layout(&output)
+                .is_some_and(|l| l.rect.contains(local))
+            {
+                return Under::Minimap;
+            }
         }
         if let Some((i, hit)) = self.window_hit(&output, local) {
             return window_under(i, hit);
@@ -400,9 +440,16 @@ impl State {
         local: Point<f64, Logical>,
     ) -> Option<Under> {
         let map = layer_map_for_output(output);
-        let surface = map.layer_under(layer, local)?;
-        let geo = map.layer_geometry(surface)?;
-        let (wl, loc) = surface.surface_under(local - geo.loc.to_f64(), WindowSurfaceType::ALL)?;
+        // Check every surface, topmost first, by its input region, not just
+        // the first whose box contains the point: shells keep full-screen
+        // click catchers mapped with an empty input region (DMS popouts), and
+        // stopping at those would send the click to whatever lies below.
+        let (wl, loc, geo) = map.layers_on(layer).rev().find_map(|surface| {
+            let geo = map.layer_geometry(surface)?;
+            let (wl, loc) =
+                surface.surface_under(local - geo.loc.to_f64(), WindowSurfaceType::ALL)?;
+            Some((wl, loc, geo))
+        })?;
         Some(Under::Surface {
             surface: wl,
             surface_loc: (geo.loc + loc).to_f64(),
@@ -430,7 +477,7 @@ impl State {
             match button_state {
                 ButtonState::Pressed
                     if self.config.canvas.middle_drag_over_windows
-                        && !self.super_held()
+                        && self.mouse_bind(MouseTrigger::Button(BTN_MIDDLE)).is_none()
                         && matches!(
                             self.under(),
                             Under::Surface {
@@ -492,17 +539,18 @@ impl State {
 
     /// Compositor reaction to a press; grabs started here receive the button.
     fn press(&mut self, button: u32, serial: smithay::utils::Serial) {
-        let super_held = self.super_held();
-        match self.under() {
-            Under::Decoration { window, .. }
-            | Under::Surface {
-                window: Some(window),
-                ..
-            } if super_held => {
-                let w = self.windows[window].window.clone();
-                self.focus_window(Some(w));
-                self.super_drag(button, serial);
+        let under = self.under();
+        // A click next to the map at the cursor dismisses it and goes on as usual.
+        if self.map_popup.is_some() && !matches!(under, Under::Minimap) {
+            self.close_map_popup();
+        }
+        if let Some(action) = self.mouse_bind(MouseTrigger::Button(button)) {
+            if self.bound_drag(action, &under, button, serial) {
+                return;
             }
+        }
+        match under {
+            Under::Minimap => self.press_minimap(button, serial),
             Under::Surface {
                 window: Some(idx), ..
             } => {
@@ -542,7 +590,7 @@ impl State {
                     (Hit::Title, BTN_LEFT) => {
                         if self.title_clicked(id) {
                             self.toggle_maximize(idx);
-                        } else {
+                        } else if self.config.canvas.titlebar_drag {
                             grabs::start_move_with_button(self, idx, serial, button);
                         }
                     }
@@ -556,33 +604,97 @@ impl State {
             Under::Empty => {
                 let pans = button == BTN_MIDDLE
                     || (button == BTN_LEFT && self.config.canvas.left_drag_pans);
-                if pans || (super_held && button == BTN_LEFT) {
+                if pans {
                     grabs::start_pan(self, serial, button);
                 }
             }
         }
     }
 
-    /// Super + drag: left moves, right resizes, middle pans.
-    fn super_drag(&mut self, button: u32, serial: smithay::utils::Serial) {
-        let Some(idx) = self.focused_index() else {
+    /// Runs a `[mouse]` drag bind. Returns false when it does not apply here
+    /// (move/resize with no window under the cursor), so the click goes on.
+    fn bound_drag(
+        &mut self,
+        action: MouseAction,
+        under: &Under,
+        button: u32,
+        serial: smithay::utils::Serial,
+    ) -> bool {
+        let window = match under {
+            Under::Decoration { window, .. }
+            | Under::Surface {
+                window: Some(window),
+                ..
+            } => Some(*window),
+            _ => None,
+        };
+        match action {
+            MouseAction::Pan | MouseAction::PanHorizontal | MouseAction::Zoom => {
+                grabs::start_pan(self, serial, button);
+                true
+            }
+            MouseAction::MoveWindow | MouseAction::ResizeWindow => {
+                let Some(window) = window else {
+                    return false;
+                };
+                let id = self.windows[window].id;
+                let w = self.windows[window].window.clone();
+                self.focus_window(Some(w));
+                let Some(idx) = self.index_of_id(id) else {
+                    return false;
+                };
+                if action == MouseAction::MoveWindow {
+                    grabs::start_move_with_button(self, idx, serial, button);
+                } else {
+                    self.start_bound_resize(idx, button, serial);
+                }
+                true
+            }
+        }
+    }
+
+    fn start_bound_resize(&mut self, idx: usize, button: u32, serial: smithay::utils::Serial) {
+        let Some(output) = self.active_output() else {
             return;
         };
-        match button {
-            BTN_LEFT => grabs::start_move_with_button(self, idx, serial, button),
-            BTN_RIGHT => {
-                let Some(output) = self.active_output() else {
-                    return;
-                };
-                let Some(view) = self.view(&self.windows[idx], &output) else {
-                    return;
-                };
-                let local = view.to_local(self.cursor_local(&output));
-                let edges = grabs::nearest_edges(local, self.windows[idx].size());
-                grabs::start_resize_with_button(self, idx, edges, serial, button);
+        let Some(view) = self.view(&self.windows[idx], &output) else {
+            return;
+        };
+        let local = view.to_local(self.cursor_local(&output));
+        let edges = grabs::nearest_edges(local, self.windows[idx].size());
+        grabs::start_resize_with_button(self, idx, edges, serial, button);
+    }
+
+    /// Left click on the minimap: a window jumps to it, anywhere else moves
+    /// the view there and keeps following while dragged.
+    fn press_minimap(&mut self, button: u32, serial: smithay::utils::Serial) {
+        if button != BTN_LEFT {
+            return;
+        }
+        let Some(output) = self.active_output() else {
+            return;
+        };
+        let local = self.cursor_local(&output);
+        let (Some(layout), Some(hit)) = (
+            self.minimap_layout(&output),
+            self.minimap_hit(&output, local),
+        ) else {
+            return;
+        };
+        match hit {
+            MapHit::Window(idx) => {
+                let id = self.windows[idx].id;
+                let w = self.windows[idx].window.clone();
+                self.focus_window(Some(w));
+                if let Some(idx) = self.index_of_id(id) {
+                    self.center_on(idx);
+                }
+                self.close_map_popup();
             }
-            BTN_MIDDLE => grabs::start_pan(self, serial, button),
-            _ => {}
+            MapHit::Canvas => {
+                self.minimap_jump(&output, &layout, local, true);
+                grabs::start_map_drag(self, output, layout, serial);
+            }
         }
     }
 
@@ -596,13 +708,24 @@ impl State {
             .amount(Axis::Vertical)
             .unwrap_or_else(|| event.amount_v120(Axis::Vertical).unwrap_or(0.0) * 15.0 / 120.0);
 
-        if self.canvas_scroll_allowed() {
-            if let Some(output) = self.active_output() {
-                self.scroll_canvas(&output, source, h, v, event.amount_v120(Axis::Vertical));
-                self.update_pointer_focus();
-                return;
-            }
+        if let (Some(mode), Some(output)) = (self.canvas_scroll_mode(), self.active_output()) {
+            // A touchpad "stop" (fingers lifted) ends the scroll right away.
+            let stopped = source == AxisSource::Finger
+                && event.amount(Axis::Horizontal) == Some(0.0)
+                && event.amount(Axis::Vertical) == Some(0.0);
+            self.scroll_latch = (!stopped).then(Instant::now);
+            self.scroll_canvas(
+                &output,
+                source,
+                h,
+                v,
+                event.amount_v120(Axis::Vertical),
+                mode,
+            );
+            self.update_pointer_focus();
+            return;
         }
+        self.scroll_latch = None;
 
         let mut frame = AxisFrame::new(event.time_msec()).source(source);
         if h != 0.0 {
@@ -634,10 +757,26 @@ impl State {
         pointer.frame(self);
     }
 
-    fn canvas_scroll_allowed(&self) -> bool {
-        !self.pointer.is_grabbed()
-            && !self.lock.is_locked()
-            && (self.super_held() || matches!(self.under(), Under::Empty))
+    /// Whether a scroll moves the canvas (and how) instead of the client
+    /// under the cursor.
+    fn canvas_scroll_mode(&self) -> Option<ScrollMode> {
+        if self.pointer.is_grabbed() || self.lock.is_locked() {
+            return None;
+        }
+        let bound = self.mouse_bind(MouseTrigger::Scroll).filter(|a| {
+            matches!(
+                a,
+                MouseAction::Zoom | MouseAction::Pan | MouseAction::PanHorizontal
+            )
+        });
+        if let Some(action) = bound {
+            return Some(ScrollMode::Bind(action));
+        }
+        let latched = self
+            .scroll_latch
+            .is_some_and(|t| t.elapsed() < SCROLL_LATCH);
+        (latched || matches!(self.under(), Under::Empty | Under::Minimap))
+            .then_some(ScrollMode::Canvas)
     }
 
     // ---- synthetic input (ipc `pointer …`, used by tests) -------------------
@@ -652,22 +791,22 @@ impl State {
 
     /// Wheel notches over the canvas (positive = scroll down = zoom out).
     pub fn synthetic_wheel(&mut self, notches: f64) {
-        if self.canvas_scroll_allowed() {
-            if let Some(output) = self.active_output() {
-                self.scroll_canvas(
-                    &output,
-                    AxisSource::Wheel,
-                    0.0,
-                    notches * 15.0,
-                    Some(notches * 120.0),
-                );
-                self.update_pointer_focus();
-            }
+        if let (Some(mode), Some(output)) = (self.canvas_scroll_mode(), self.active_output()) {
+            self.scroll_canvas(
+                &output,
+                AxisSource::Wheel,
+                0.0,
+                notches * 15.0,
+                Some(notches * 120.0),
+                mode,
+            );
+            self.update_pointer_focus();
         }
     }
 
-    /// Wheel zooms around the cursor; touchpad scrolling pans (Ctrl+scroll
-    /// zooms); Shift+wheel pans sideways.
+    /// Bound scrolls do what their action says. Plain canvas scrolling: the
+    /// wheel zooms around the cursor (or pans with `wheel_zooms = false`);
+    /// touchpad scrolling pans (Ctrl+scroll zooms); Shift+wheel pans sideways.
     fn scroll_canvas(
         &mut self,
         output: &Output,
@@ -675,15 +814,48 @@ impl State {
         h: f64,
         v: f64,
         v120: Option<f64>,
+        mode: ScrollMode,
     ) {
         let mods = self.seat.get_keyboard().map(|k| k.modifier_state());
         let (ctrl, shift) = mods.map(|m| (m.ctrl, m.shift)).unwrap_or_default();
         let anchor = self.cursor_local(output);
         let wheel = matches!(source, AxisSource::Wheel | AxisSource::WheelTilt);
-        if wheel && !shift && (self.config.canvas.wheel_zooms || self.super_held()) {
+        let factor = if wheel { 3.0 } else { 1.0 };
+        let zoom = |state: &mut Self| {
             let notches = v120.map(|d| d / 120.0).unwrap_or(v / 15.0);
-            let factor = self.config.canvas.zoom_step.powf(-notches);
-            self.zoom_at(output, anchor, factor, true);
+            let factor = state.config.canvas.zoom_step.powf(-notches);
+            state.zoom_at(output, anchor, factor, true);
+        };
+        let action = match mode {
+            ScrollMode::Bind(action) => action,
+            ScrollMode::Canvas => {
+                self.scroll_canvas_default(output, wheel, ctrl, shift, h, v, zoom);
+                return;
+            }
+        };
+        match action {
+            MouseAction::Zoom if wheel => zoom(self),
+            MouseAction::PanHorizontal if wheel => {
+                self.pan(output, Point::from((-v - h, 0.0)).upscale(factor), false)
+            }
+            _ => self.pan(output, Point::from((-h, -v)).upscale(factor), false),
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn scroll_canvas_default(
+        &mut self,
+        output: &Output,
+        wheel: bool,
+        ctrl: bool,
+        shift: bool,
+        h: f64,
+        v: f64,
+        zoom: impl FnOnce(&mut Self),
+    ) {
+        let anchor = self.cursor_local(output);
+        if wheel && !shift && self.config.canvas.wheel_zooms {
+            zoom(self);
         } else if ctrl && !wheel {
             self.zoom_at(output, anchor, (1.0 - v * 0.01).clamp(0.5, 2.0), false);
         } else {

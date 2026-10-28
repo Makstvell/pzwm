@@ -75,7 +75,7 @@ pub fn init(event_loop: &mut EventLoop<'static, State>, config: Config) -> anyho
             model: "nested".into(),
         },
     );
-    let scale = config.output("winit").and_then(|o| o.scale).unwrap_or(1.0);
+    let scale = config.output_scale("winit");
     output.change_current_state(
         Some(mode),
         Some(Transform::Flipped180),

@@ -1,7 +1,8 @@
 # pzwm configuration
 #
 # Copy to ~/.config/pzwm/config.toml and edit. Every option is optional:
-# anything you leave out keeps the value shown here. Reload with Super+Shift+R.
+# anything you leave out keeps the value shown here. Changes apply when you
+# save the file; `pzwm reload` or Super+Shift+R reload by hand.
 # Colors are "#RRGGBB" or "#RRGGBBAA".
 
 [general]
@@ -20,6 +21,12 @@ cursor_theme = "default"
 cursor_size = 24
 # Ask apps to let pzwm draw the titlebar (apps that refuse keep their own).
 prefer_server_decorations = true
+# Scale (DPI factor) for every output without its own [[output]] scale,
+# e.g. 1.5 for a 2560x1440 laptop panel.
+scale = 1.0
+# Apply changes as soon as config.toml is saved (also: `pzwm reload`).
+# A file with an error is not applied: you get a notification instead.
+auto_reload = true
 
 [input]
 layouts = "us"          # e.g. "us,ua,de"
@@ -49,6 +56,28 @@ window_step = 40        # keyboard move/resize step
 grid = "dots"           # "dots", "lines" or "none"
 grid_spacing = 32.0
 per_workspace_camera = true
+titlebar_drag = true    # false: windows stay put; move them only with the move-window mouse bind
+resize_margin = 12.0    # invisible grab zone outside window edges for resizing
+resize_corner = 28.0    # how far from a corner the edge zone resizes diagonally
+new_window_width = 0.6   # new windows open at this share of the screen (0.1 .. 1.0);
+new_window_height = 0.7  # dialogs and fixed-size windows keep their own size
+
+[minimap]
+# Map of the whole workspace with live previews of every window and the
+# visible area. Click a window to jump to it, click or drag anywhere else to
+# move the view.
+# position = "cursor": hidden until the "minimap" action (Super+M) opens it
+# under the pointer. Tap the key to keep it open, or hold it and let go to
+# close; a click, Esc or a click outside closes it too.
+# A corner position keeps the map always on screen; Super+M hides it.
+enabled = true
+position = "cursor"         # cursor, bottom-right, bottom-left, top-right, top-left
+width = 220.0               # corner map
+popup_width = 560.0         # map at the cursor
+background = "#0f1117d9"
+window_color = "#4b5263"
+focused_color = "#22d3ee"
+viewport_color = "#8b5cf6"
 
 [animation]
 enabled = true
@@ -78,6 +107,13 @@ pinned_accent = "#f59e0b"
 # scale = 1.5
 # mode = "2560x1440@165"
 # position = "0,0"
+#
+# Show a copy of another monitor (projector, TV) instead of extending:
+# [[output]]
+# name = "HDMI-A-1"
+# mirror = "eDP-1"
+# A mirror has no workspace or bar of its own; it is scaled to fit its
+# resolution without cropping. Takes effect when the monitor is plugged in.
 
 # Key bindings: "Mods+Key" = "action".
 # Mods: Super, Ctrl, Alt, Shift. Keys are xkb names (Return, Tab, a, F1, Print,
@@ -86,19 +122,36 @@ pinned_accent = "#f59e0b"
 # Actions:
 #   spawn <command>           close              maximize        fullscreen
 #   pin                       center             overview        home
+#   fit (center the window and zoom so it fills the screen)
 #   focus left|right|up|down|next|prev           zoom-in / zoom-out / zoom-reset
 #   move-window <dir>         resize-window <dir>                pan <dir>
 #   snap left|right|up|down   workspace <1-10>   move-to-workspace <1-10>
 #   layout next|<index>       reload-config      quit            vt <1-12>
+#   minimap (toggle)          window <1-10> (n-th window in the order it was opened)
 #
-# Mouse (fixed):
+# Built-in mouse behaviour:
 #   middle-drag anywhere (a plain middle click still pastes) .. pan (like a design tool)
 #   left-drag on empty canvas ................................. pan
-#   wheel on empty canvas / Super+wheel anywhere .............. zoom around the cursor
+#   wheel on empty canvas ..................................... zoom around the cursor
 #   touchpad: two fingers on empty canvas pan, pinch zooms, three-finger swipe pans
-#   Super+left-drag ........................................... move window
-#   Super+right-drag / window edges ........................... resize window
 #   titlebar: drag to move, double-click to maximize, buttons close / maximize / pin
+#   window edges and corners .................................. resize
+# A scroll that starts on empty canvas keeps moving the canvas even when a
+# window slides under the cursor, until you pause.
+# Mouse binds work anywhere, also over windows: "Mods+Trigger" = "action".
+# Triggers: left, right, middle, back, forward, scroll.
+# Drag actions: pan, move-window, resize-window.
+# Scroll actions: zoom (wheel zooms, touchpad pans), pan, pan-horizontal.
+# Set a bind to "none" to remove it.
+[mouse]
+"Super+scroll" = "zoom"
+"Super+Ctrl+scroll" = "pan"
+"Super+Shift+scroll" = "pan-horizontal"
+"Super+left" = "pan"
+"Super+middle" = "pan"
+"Super+Shift+left" = "move-window"
+"Super+right" = "resize-window"
+
 [binds]
 "Super+Return" = "spawn ${TERMINAL:-foot}"
 "Super+D" = "spawn rofi -show drun || fuzzel"
@@ -107,9 +160,10 @@ pinned_accent = "#f59e0b"
 "Super+F" = "maximize"
 "Super+Shift+F" = "fullscreen"
 "Super+P" = "pin"
-"Super+C" = "center"
+"Super+C" = "fit"
 "Super+Tab" = "overview"
 "Super+Z" = "overview"
+"Super+M" = "minimap"
 "Super+Home" = "home"
 "Super+equal" = "zoom-in"
 "Super+minus" = "zoom-out"
@@ -140,16 +194,26 @@ pinned_accent = "#f59e0b"
 "Super+bracketleft" = "snap left"
 "Super+bracketright" = "snap right"
 
-"Super+1" = "workspace 1"
-"Super+2" = "workspace 2"
-"Super+3" = "workspace 3"
-"Super+4" = "workspace 4"
-"Super+5" = "workspace 5"
-"Super+6" = "workspace 6"
-"Super+7" = "workspace 7"
-"Super+8" = "workspace 8"
-"Super+9" = "workspace 9"
-"Super+0" = "workspace 10"
+"Super+1" = "window 1"
+"Super+Ctrl+1" = "workspace 1"
+"Super+2" = "window 2"
+"Super+Ctrl+2" = "workspace 2"
+"Super+3" = "window 3"
+"Super+Ctrl+3" = "workspace 3"
+"Super+4" = "window 4"
+"Super+Ctrl+4" = "workspace 4"
+"Super+5" = "window 5"
+"Super+Ctrl+5" = "workspace 5"
+"Super+6" = "window 6"
+"Super+Ctrl+6" = "workspace 6"
+"Super+7" = "window 7"
+"Super+Ctrl+7" = "workspace 7"
+"Super+8" = "window 8"
+"Super+Ctrl+8" = "workspace 8"
+"Super+9" = "window 9"
+"Super+Ctrl+9" = "workspace 9"
+"Super+0" = "window 10"
+"Super+Ctrl+0" = "workspace 10"
 "Super+Shift+1" = "move-to-workspace 1"
 "Super+Shift+2" = "move-to-workspace 2"
 "Super+Shift+3" = "move-to-workspace 3"

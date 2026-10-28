@@ -45,6 +45,7 @@ fi
 FILES=(
     "$PREFIX/bin/pzwm"
     "$PREFIX/bin/pzwm-session"
+    "$PREFIX/bin/umbriel"
     "$SESSIONS_DIR/pzwm.desktop"
     "$PREFIX/lib/systemd/user/pzwm-session.target"
     "$PREFIX/share/xdg-desktop-portal/pzwm-portals.conf"
@@ -53,7 +54,7 @@ FILES=(
 if [ "$UNINSTALL" = 1 ]; then
     bold "Removing pzwm"
     for f in "${FILES[@]}"; do
-        if [ -e "$f" ]; then $SUDO rm -f "$f" && ok "removed $f"; fi
+        if [ -e "$f" ] || [ -L "$f" ]; then $SUDO rm -f "$f" && ok "removed $f"; fi
     done
     echo "Your config in ~/.config/pzwm was left alone."
     exit 0
@@ -85,6 +86,8 @@ fi
 bold "Installing to $PREFIX"
 $SUDO install -Dm755 target/release/pzwm "$PREFIX/bin/pzwm"
 $SUDO install -Dm755 resources/pzwm-session "$PREFIX/bin/pzwm-session"
+# DankMaterialShell switches workspaces through `umbriel msg` (see src/bar.rs).
+$SUDO ln -sf pzwm "$PREFIX/bin/umbriel"
 $SUDO install -Dm644 resources/pzwm.desktop "$SESSIONS_DIR/pzwm.desktop"
 $SUDO install -Dm644 resources/pzwm-session.target "$PREFIX/lib/systemd/user/pzwm-session.target"
 $SUDO install -Dm644 resources/pzwm-portals.conf "$PREFIX/share/xdg-desktop-portal/pzwm-portals.conf"

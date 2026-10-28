@@ -3,11 +3,20 @@
 
 use smithay::{
     backend::input::{KeyState, Keycode},
+    desktop::layer_map_for_output,
     input::keyboard::{FilterResult, Keysym, Layout},
+    output::Scale,
+    reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::Point,
-    wayland::keyboard_shortcuts_inhibit::KeyboardShortcutsInhibitorSeat,
+    wayland::{
+        compositor::with_states, fractional_scale::with_fractional_scale,
+        keyboard_shortcuts_inhibit::KeyboardShortcutsInhibitorSeat,
+    },
 };
-use tracing::info;
+use std::time::{Duration, SystemTime};
+
+use smithay::reexports::calloop::timer::{TimeoutAction, Timer};
+use tracing::{info, warn};
 
 use crate::{
     action::{Action, Dir},
@@ -35,6 +44,9 @@ impl State {
             time,
             |state, mods, handle| {
                 if key_state == KeyState::Released {
+                    if state.map_popup.as_ref().and_then(|p| p.key) == Some(keycode) {
+                        state.map_key_released();
+                    }
                     return match state.suppressed_keys.iter().position(|k| *k == keycode) {
                         Some(i) => {
                             state.suppressed_keys.remove(i);
@@ -62,6 +74,10 @@ impl State {
                     .raw_latin_sym_or_raw_current_sym()
                     .unwrap_or_else(|| handle.modified_sym());
                 let sym = lowercase(sym);
+                if state.map_popup.is_some() && sym == Keysym::Escape {
+                    state.suppressed_keys.push(keycode);
+                    return FilterResult::Intercept(Some(Action::ToggleMinimap));
+                }
                 match find_bind(&state.config, pressed, sym) {
                     Some(action) => {
                         state.suppressed_keys.push(keycode);
@@ -72,7 +88,12 @@ impl State {
             },
         );
         if let Some(Some(action)) = action {
+            let calls_map = action == Action::ToggleMinimap;
             self.do_action(action);
+            // Remember the key so letting go of it after a hold closes the map.
+            if let Some(popup) = self.map_popup.as_mut().filter(|_| calls_map) {
+                popup.key.get_or_insert(keycode);
+            }
         }
     }
 
@@ -98,9 +119,23 @@ impl State {
             Action::ToggleFullscreen => focused.into_iter().for_each(|i| self.toggle_fullscreen(i)),
             Action::TogglePin => focused.into_iter().for_each(|i| self.toggle_pin(i)),
             Action::CenterWindow => focused.into_iter().for_each(|i| self.center_on(i)),
+            Action::FitWindow => focused.into_iter().for_each(|i| self.fit_window(i)),
+            Action::Profile(args) => {
+                let args: Vec<&str> = args.split_whitespace().collect();
+                let (title, body) = match self.profile_command(&args) {
+                    Ok(msg) => ("pzwm", msg),
+                    Err(err) => ("pzwm: profile error", err),
+                };
+                self.spawn(&format!(
+                    "notify-send -a pzwm {} {}",
+                    shell_quote(title),
+                    shell_quote(&body)
+                ));
+            }
             Action::FocusDir(dir) => self.focus_dir(dir),
             Action::FocusNext => self.focus_cycle(true),
             Action::FocusPrev => self.focus_cycle(false),
+            Action::FocusNth(n) => self.focus_nth(n),
             Action::MoveWindow(dir) => {
                 if let Some(i) = focused {
                     let (dx, dy) = dir.vector();
@@ -149,6 +184,7 @@ impl State {
             Action::ZoomReset => output.into_iter().for_each(|o| self.zoom_reset(&o)),
             Action::Overview => output.into_iter().for_each(|o| self.overview(&o)),
             Action::Home => output.into_iter().for_each(|o| self.home(&o)),
+            Action::ToggleMinimap => self.toggle_minimap(),
             Action::Workspace(ws) => self.switch_workspace(ws),
             Action::MoveToWorkspace(ws) => focused
                 .into_iter()
@@ -163,7 +199,9 @@ impl State {
                     keyboard.with_xkb_state(self, |mut ctx| ctx.set_layout(Layout(n)));
                 }
             }
-            Action::ReloadConfig => self.reload_config(),
+            Action::ReloadConfig => {
+                let _ = self.reload_config();
+            }
             Action::Quit => {
                 info!("quit requested");
                 self.loop_signal.stop();
@@ -173,8 +211,20 @@ impl State {
         self.update_pointer_focus();
     }
 
-    pub fn reload_config(&mut self) {
-        let config = Config::load();
+    /// Applies the config file to the running session. A file that does not
+    /// parse is reported (log + notification) and the current config stays.
+    pub fn reload_config(&mut self) -> Result<(), String> {
+        let config = match Config::try_load() {
+            Ok(config) => config,
+            Err(err) => {
+                warn!("config not reloaded: {err}");
+                self.spawn(&format!(
+                    "notify-send -a pzwm 'pzwm: config error' {}",
+                    shell_quote(&err)
+                ));
+                return Err(err);
+            }
+        };
         if let Some(keyboard) = self.seat.get_keyboard() {
             let input = &config.input;
             let xkb = smithay::input::keyboard::XkbConfig {
@@ -195,9 +245,100 @@ impl State {
         );
         self.config = config;
         crate::backend::reconfigure_input(self);
+        self.apply_output_scales();
         self.queue_redraw_all();
         info!("config reloaded");
+        Ok(())
     }
+
+    /// Polls the config file and reloads it when it changes (if
+    /// `auto_reload` is on). Polling needs no extra dependency and copes with
+    /// editors that save by replacing the file.
+    pub fn watch_config(&mut self) {
+        const POLL: Duration = Duration::from_millis(750);
+        let mtime = || {
+            std::fs::metadata(Config::path())
+                .and_then(|m| m.modified())
+                .ok()
+        };
+        let mut last: Option<SystemTime> = mtime();
+        let source =
+            self.loop_handle
+                .insert_source(Timer::from_duration(POLL), move |_, _, state| {
+                    let now = mtime();
+                    if now != last {
+                        last = now;
+                        if state.config.general.auto_reload {
+                            let _ = state.reload_config();
+                        }
+                    }
+                    TimeoutAction::ToDuration(POLL)
+                });
+        if let Err(err) = source {
+            warn!("config watcher: {err}");
+        }
+    }
+
+    /// Applies changed `scale` / `position` settings to running outputs and
+    /// tells clients their new preferred scale.
+    fn apply_output_scales(&mut self) {
+        let mut changed = false;
+        for output in self.outputs.clone() {
+            let name = output.name();
+            let scale = self.config.output_scale(&name);
+            let position = self
+                .config
+                .output(&name)
+                .and_then(|o| o.position())
+                .map(Point::from);
+            let scale_changed = (output.current_scale().fractional_scale() - scale).abs() > 1e-6;
+            let moved = position.is_some_and(|p| p != output.current_location());
+            if !scale_changed && !moved {
+                continue;
+            }
+            output.change_current_state(
+                None,
+                None,
+                scale_changed.then_some(Scale::Fractional(scale)),
+                position,
+            );
+            info!("output {name}: scale {scale}");
+            changed = true;
+        }
+        if !changed {
+            return;
+        }
+        let mut surfaces: Vec<(WlSurface, f64)> = Vec::new();
+        for m in &self.windows {
+            let scale = m
+                .output
+                .as_deref()
+                .and_then(|n| self.output_by_name(n))
+                .or_else(|| self.outputs.first().cloned())
+                .map(|o| o.current_scale().fractional_scale())
+                .unwrap_or(1.0);
+            if let Some(surface) = m.wl_surface() {
+                surfaces.push((surface, scale));
+            }
+        }
+        for output in &self.outputs {
+            let scale = output.current_scale().fractional_scale();
+            for layer in layer_map_for_output(output).layers() {
+                surfaces.push((layer.wl_surface().clone(), scale));
+            }
+        }
+        for (surface, scale) in surfaces {
+            with_states(&surface, |states| {
+                with_fractional_scale(states, |fs| fs.set_preferred_scale(scale));
+            });
+        }
+        self.relayout_outputs();
+    }
+}
+
+/// Quotes `s` as one `sh` word.
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
 }
 
 fn lowercase(sym: Keysym) -> Keysym {
