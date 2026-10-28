@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Infinite-canvas Wayland compositor: pan, zoom, float windows like in a design tool"
-license = "MIT"
+license = "GPL-2.0-or-later"
 readme = "README.md"
 repository = "https://github.com/Makstvell/pzwm"
 
