@@ -1,4 +1,4 @@
-# pzwm
+# pzwm - Pan And Zoom Window Manager
 
 ![pzwm](docs/screenshot.png)
 
