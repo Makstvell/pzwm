@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=pzwm
+Comment=Infinite-canvas Wayland compositor
+Exec=pzwm-session
+Type=Application
+DesktopNames=pzwm

@@ -1,0 +1,21 @@
+#!/bin/sh
+# Login entry for pzwm: display managers start this through pzwm.desktop,
+# or run it yourself from a TTY.
+
+export XDG_CURRENT_DESKTOP=pzwm
+export XDG_SESSION_DESKTOP=pzwm
+export XDG_SESSION_TYPE=wayland
+# Prefer native Wayland in toolkits that need a nudge.
+export MOZ_ENABLE_WAYLAND=1
+export QT_QPA_PLATFORM="wayland;xcb"
+export ELECTRON_OZONE_PLATFORM_HINT=auto
+export _JAVA_AWT_WM_NONREPARENTING=1
+
+# Personal environment tweaks (plain `export VAR=value` lines).
+[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/pzwm/env" ] && . "${XDG_CONFIG_HOME:-$HOME/.config}/pzwm/env"
+
+# Logs: `journalctl --user -t pzwm -b`
+if command -v systemd-cat >/dev/null 2>&1; then
+    exec systemd-cat -t pzwm -- pzwm --tty
+fi
+exec pzwm --tty

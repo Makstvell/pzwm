@@ -1,0 +1,179 @@
+# pzwm configuration
+#
+# Copy to ~/.config/pzwm/config.toml and edit. Every option is optional:
+# anything you leave out keeps the value shown here. Reload with Super+Shift+R.
+# Colors are "#RRGGBB" or "#RRGGBBAA".
+
+[general]
+# Commands run once at startup through `sh -c`.
+autostart = [
+    # "waybar",
+    # "swaybg -i ~/Pictures/wallpaper.jpg",
+]
+# Starts pzwm-session.target, which pulls in graphical-session.target.
+# Shells and bars shipped as systemd user services (DankMaterialShell, ...)
+# start through it, exactly like under Hyprland or niri.
+systemd_session = true
+# Runs xwayland-satellite (if installed) so X11 apps work.
+xwayland = true
+cursor_theme = "default"
+cursor_size = 24
+# Ask apps to let pzwm draw the titlebar (apps that refuse keep their own).
+prefer_server_decorations = true
+
+[input]
+layouts = "us"          # e.g. "us,ua,de"
+variant = ""
+options = ""            # e.g. "grp:alt_shift_toggle,caps:escape"
+model = ""
+repeat_rate = 25
+repeat_delay = 600
+natural_scroll = true   # touchpad
+mouse_natural_scroll = false
+tap_to_click = true
+tap_and_drag = true
+disable_while_typing = true
+accel_speed = 0.0       # -1.0 .. 1.0
+
+[canvas]
+zoom_step = 1.12        # zoom factor per wheel notch
+min_zoom = 0.08
+max_zoom = 3.0
+wheel_zooms = true      # wheel on empty canvas: zoom (true) or pan (false)
+left_drag_pans = true   # left-drag on empty canvas pans, like middle-drag
+middle_drag_over_windows = true  # middle-drag pans over windows too; a plain middle click still reaches the app
+snap_distance = 14.0    # magnetic edges while dragging, in screen pixels
+edge_tiling = true      # drop a window on the left/right screen edge to tile it
+pan_step = 160.0        # keyboard pan step
+window_step = 40        # keyboard move/resize step
+grid = "dots"           # "dots", "lines" or "none"
+grid_spacing = 32.0
+per_workspace_camera = true
+
+[animation]
+enabled = true
+window_ms = 130         # open / close / maximize
+camera_ms = 110         # zoom / overview / center; short on purpose, no inertia
+
+[appearance]
+gaps = 10
+border_width = 2.0
+corner_radius = 12.0
+titlebar = true
+titlebar_height = 30
+shadow_size = 26.0
+shadow_color = "#0000008c"
+background = "#0b0d12"
+grid_color = "#ffffff1c"
+active_border_start = "#8b5cf6"
+active_border_end = "#22d3ee"
+inactive_border = "#353b48"
+titlebar_color = "#14161d"
+titlebar_active_color = "#1b1e29"
+pinned_accent = "#f59e0b"
+
+# Per-monitor settings. Output names are printed in the log at startup.
+# [[output]]
+# name = "eDP-1"
+# scale = 1.5
+# mode = "2560x1440@165"
+# position = "0,0"
+
+# Key bindings: "Mods+Key" = "action".
+# Mods: Super, Ctrl, Alt, Shift. Keys are xkb names (Return, Tab, a, F1, Print,
+# XF86AudioRaiseVolume, ...). Set a bind to "none" to remove it.
+#
+# Actions:
+#   spawn <command>           close              maximize        fullscreen
+#   pin                       center             overview        home
+#   focus left|right|up|down|next|prev           zoom-in / zoom-out / zoom-reset
+#   move-window <dir>         resize-window <dir>                pan <dir>
+#   snap left|right|up|down   workspace <1-10>   move-to-workspace <1-10>
+#   layout next|<index>       reload-config      quit            vt <1-12>
+#
+# Mouse (fixed):
+#   middle-drag anywhere (a plain middle click still pastes) .. pan (like a design tool)
+#   left-drag on empty canvas ................................. pan
+#   wheel on empty canvas / Super+wheel anywhere .............. zoom around the cursor
+#   touchpad: two fingers on empty canvas pan, pinch zooms, three-finger swipe pans
+#   Super+left-drag ........................................... move window
+#   Super+right-drag / window edges ........................... resize window
+#   titlebar: drag to move, double-click to maximize, buttons close / maximize / pin
+[binds]
+"Super+Return" = "spawn ${TERMINAL:-foot}"
+"Super+D" = "spawn rofi -show drun || fuzzel"
+"Super+E" = "spawn nautilus --new-window"
+"Super+Q" = "close"
+"Super+F" = "maximize"
+"Super+Shift+F" = "fullscreen"
+"Super+P" = "pin"
+"Super+C" = "center"
+"Super+Tab" = "overview"
+"Super+Z" = "overview"
+"Super+Home" = "home"
+"Super+equal" = "zoom-in"
+"Super+minus" = "zoom-out"
+"Super+BackSpace" = "zoom-reset"
+
+"Super+Left" = "focus left"
+"Super+Right" = "focus right"
+"Super+Up" = "focus up"
+"Super+Down" = "focus down"
+"Super+h" = "focus left"
+"Super+j" = "focus down"
+"Super+k" = "focus up"
+"Alt+Tab" = "focus next"
+"Alt+Shift+Tab" = "focus prev"
+
+"Super+Ctrl+Left" = "move-window left"
+"Super+Ctrl+Right" = "move-window right"
+"Super+Ctrl+Up" = "move-window up"
+"Super+Ctrl+Down" = "move-window down"
+"Super+Shift+Left" = "resize-window left"
+"Super+Shift+Right" = "resize-window right"
+"Super+Shift+Up" = "resize-window up"
+"Super+Shift+Down" = "resize-window down"
+"Super+Alt+Left" = "pan left"
+"Super+Alt+Right" = "pan right"
+"Super+Alt+Up" = "pan up"
+"Super+Alt+Down" = "pan down"
+"Super+bracketleft" = "snap left"
+"Super+bracketright" = "snap right"
+
+"Super+1" = "workspace 1"
+"Super+2" = "workspace 2"
+"Super+3" = "workspace 3"
+"Super+4" = "workspace 4"
+"Super+5" = "workspace 5"
+"Super+6" = "workspace 6"
+"Super+7" = "workspace 7"
+"Super+8" = "workspace 8"
+"Super+9" = "workspace 9"
+"Super+0" = "workspace 10"
+"Super+Shift+1" = "move-to-workspace 1"
+"Super+Shift+2" = "move-to-workspace 2"
+"Super+Shift+3" = "move-to-workspace 3"
+"Super+Shift+4" = "move-to-workspace 4"
+"Super+Shift+5" = "move-to-workspace 5"
+"Super+Shift+6" = "move-to-workspace 6"
+"Super+Shift+7" = "move-to-workspace 7"
+"Super+Shift+8" = "move-to-workspace 8"
+"Super+Shift+9" = "move-to-workspace 9"
+"Super+Shift+0" = "move-to-workspace 10"
+
+"Super+Shift+space" = "layout next"
+
+"Print" = "spawn mkdir -p ~/Pictures/Screenshots && grim ~/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png"
+"Super+Shift+S" = "spawn grim -g \"$(slurp)\" - | wl-copy"
+"XF86AudioRaiseVolume" = "spawn wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"
+"XF86AudioLowerVolume" = "spawn wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+"XF86AudioMute" = "spawn wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+"XF86AudioMicMute" = "spawn wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
+"XF86MonBrightnessUp" = "spawn brightnessctl set 5%+"
+"XF86MonBrightnessDown" = "spawn brightnessctl set 5%-"
+"XF86AudioPlay" = "spawn playerctl play-pause"
+"XF86AudioNext" = "spawn playerctl next"
+"XF86AudioPrev" = "spawn playerctl previous"
+
+"Super+Shift+R" = "reload-config"
+"Super+Ctrl+Q" = "quit"

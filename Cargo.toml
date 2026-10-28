@@ -1,0 +1,38 @@
+[package]
+name = "pzwm"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Infinite-canvas Wayland compositor: pan, zoom, float windows like in a design tool"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/Makstvell/pzwm"
+
+[dependencies]
+smithay = { version = "0.7.0", default-features = false, features = [
+    "backend_drm",
+    "backend_gbm",
+    "backend_egl",
+    "backend_libinput",
+    "backend_session_libseat",
+    "backend_udev",
+    "backend_winit",
+    "renderer_gl",
+    "renderer_multi",
+    "use_system_lib",
+    "wayland_frontend",
+    "desktop",
+] }
+smithay-drm-extras = { version = "0.1.0", default-features = false }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+xcursor = "0.3"
+anyhow = "1"
+calloop = { version = "0.14", features = ["signals"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+debug = "line-tables-only"

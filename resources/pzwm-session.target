@@ -1,0 +1,12 @@
+[Unit]
+Description=pzwm compositor session
+Documentation=https://github.com/Makstvell/pzwm
+# Started by pzwm once its Wayland socket exists. Binding to
+# graphical-session.target starts every user service wanted by it
+# (DankMaterialShell, waybar units, portals, polkit agents) and stops
+# them again when pzwm exits.
+BindsTo=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
+RefuseManualStart=no
+StopWhenUnneeded=no
