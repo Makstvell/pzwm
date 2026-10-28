@@ -118,7 +118,7 @@ pzwm --nested
   перевизначається через `[[output]] scale`. Назви моніторів — у лозі.
 - `[mouse]` — біндинги миші, `"Super+Shift+left" = "move-window"` тощо.
 - `[minimap]` — міні-карта з живими прев'ю вікон: `enabled`, `position` (`cursor` — викликається `Super+M` біля курсора; або кут екрана), `width`, `popup_width`, кольори.
-- Нові вікна відкриваються на 60 % × 70 % екрана: `[canvas] new_window_width`,
+- Нові вікна відкриваються на 90 % × 90 % екрана: `[canvas] new_window_width`,
   `new_window_height`. Діалоги й вікна фіксованого розміру — як є.
 - Дзеркало монітора: `[[output]] name = "HDMI-A-1"` + `mirror = "eDP-1"`.
 - Профілі робочого столу: `pzwm msg profile save work` / `profile load work` /

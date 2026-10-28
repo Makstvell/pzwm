@@ -328,8 +328,8 @@ impl Default for Canvas {
             titlebar_drag: true,
             resize_margin: 12.0,
             resize_corner: 28.0,
-            new_window_width: 0.6,
-            new_window_height: 0.7,
+            new_window_width: 0.9,
+            new_window_height: 0.9,
         }
     }
 }

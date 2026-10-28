@@ -59,8 +59,8 @@ per_workspace_camera = true
 titlebar_drag = true    # false: windows stay put; move them only with the move-window mouse bind
 resize_margin = 12.0    # invisible grab zone outside window edges for resizing
 resize_corner = 28.0    # how far from a corner the edge zone resizes diagonally
-new_window_width = 0.6   # new windows open at this share of the screen (0.1 .. 1.0);
-new_window_height = 0.7  # dialogs and fixed-size windows keep their own size
+new_window_width = 0.9   # new windows open at this share of the screen (0.1 .. 1.0);
+new_window_height = 0.9  # dialogs and fixed-size windows keep their own size
 
 [minimap]
 # Map of the whole workspace with live previews of every window and the

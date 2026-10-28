@@ -44,7 +44,7 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
   touchpad or keyboard. Each workspace remembers its own view.
 - `Super+C` fits the focused window: centers it and zooms until it fills
   the screen.
-- New windows open at the same size (60 % × 70 % of the screen by default),
+- New windows open at the same size (90 % × 90 % of the screen by default),
   not at whatever size the app remembered.
 - Maximize, fullscreen, pin a window to the screen, half-screen tiling by
   dropping a window on a screen edge, magnetic edges.
@@ -250,8 +250,8 @@ autostart = ["waybar", "swaybg -i ~/wall.jpg"]
 scale = 1.5
 
 [canvas]
-new_window_width = 0.6    # share of the screen, 0.1 … 1.0
-new_window_height = 0.7
+new_window_width = 0.9    # share of the screen, 0.1 … 1.0
+new_window_height = 0.9
 
 [binds]
 "Super+Return" = "spawn kitty"
