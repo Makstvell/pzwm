@@ -10,6 +10,26 @@ Your windows live on one big **infinite canvas**. You move around it and
 zoom in and out, like in Figma or Miro. There is no tiling grid: you put
 windows wherever you want, and zoom out to see all of them at once.
 
+## Features
+
+- **Infinite canvas** with smooth zoom around the cursor and panning by
+  mouse, touchpad or keyboard; each workspace remembers its own view.
+- **Fit a window to the screen**: `Super+C` centers the focused window and
+  zooms until it fills the visible area.
+- **Same size for every new window**: apps open at 60 % × 70 % of the screen
+  instead of whatever size they remembered (configurable).
+- **Minimap** with live window previews: jump to a window or drag the view.
+- **10 workspaces**, shown in the DankMaterialShell bar.
+- **Desktop profiles**: save where your apps are and restore them later,
+  apps that are not running are started and put back in place.
+- **Several monitors**: mode, scale and position per monitor, or
+  **mirroring** one monitor onto another.
+- **Screen sharing** and screenshots through `xdg-desktop-portal-wlr`
+  (wlr-screencopy).
+- Maximize, fullscreen, pin to screen, half-screen tiling by dragging to an
+  edge, magnetic edges, server-side title bars.
+- Scriptable through `pzwm msg …`; the config reloads when you save it.
+
 ## Works with
 
 pzwm draws only the windows and the canvas. A bar, launcher, notifications
@@ -26,6 +46,11 @@ and lock screen come from other programs, and these work:
 - **X11 apps**: [xwayland-satellite](https://github.com/Supreeeme/xwayland-satellite)
 
 ### DMS setup
+
+The DMS workspace widget shows pzwm's workspaces 1 … 10 and switches them
+on click. pzwm speaks the small protocol DMS already supports for the
+Umbriel compositor: it exports `UMBRIEL_SOCKET`, and the installer adds an
+`umbriel` command (a link to `pzwm`) that DMS calls to switch workspaces.
 
 If DMS runs as a systemd service, pzwm starts it for you. If DMS was
 only set up for another compositor (for example Hyprland), run this once:
@@ -55,7 +80,7 @@ cd pzwm
 openSUSE, Void). If you already have them, run just `./install.sh`.
 
 Recommended extras:
-`xwayland-satellite grim slurp wl-clipboard xdg-desktop-portal-gtk`.
+`xwayland-satellite grim slurp wl-clipboard xdg-desktop-portal-gtk xdg-desktop-portal-wlr`.
 
 **Try it first**, without logging out. This opens pzwm in a window:
 
@@ -114,7 +139,7 @@ On a touchpad: pinch to zoom, three fingers to move.
 | `Super+P` | pin window to the screen (it stays while the canvas moves) |
 | `Super+Tab` or `Super+Z` | show all windows; press again to go back |
 | `Super+M` | minimap (tap: stays open, hold: closes when you let go) |
-| `Super+C` | center on the focused window |
+| `Super+C` | center the focused window and zoom so it fills the screen |
 | `Super+Home` | go to the start of the canvas |
 | `Super+=` / `Super+-` | zoom in / out |
 | `Super+BackSpace` | zoom to 100 % |
@@ -132,6 +157,12 @@ On a touchpad: pinch to zoom, three fingers to move.
 | `Super+Shift+S` | screenshot of an area to the clipboard |
 | `Super+Shift+R` | reload the config |
 | `Super+Ctrl+Q` | quit pzwm |
+
+### Workspaces
+
+There are 10 workspaces. Each monitor shows one of them, and every
+workspace has its own camera (position and zoom). Switch with
+`Super+Ctrl+1` … `0` or by clicking a workspace in the DMS bar.
 
 ## Config
 
@@ -156,12 +187,97 @@ Change shortcuts in `[binds]` (keyboard) and `[mouse]` (mouse):
 "Alt+left" = "move-window"       # add your own
 ```
 
+### New windows
+
+New windows open at a share of the screen; dialogs and fixed-size windows
+keep their own size:
+
+```toml
+[canvas]
+new_window_width = 0.6    # 0.1 … 1.0
+new_window_height = 0.7
+```
+
+### Monitors
+
+Monitor names (`eDP-1`, `HDMI-A-1`, …) are printed in the log at startup
+and by `pzwm msg outputs`.
+
+```toml
+[[output]]
+name = "eDP-1"
+mode = "2560x1440@165"
+scale = 1.5
+position = "0,0"
+
+[[output]]
+name = "HDMI-A-1"
+scale = 1.0
+position = "1707,0"       # right of the laptop: 2560 / 1.5
+```
+
+To show a copy of one monitor on another (projector, TV) instead of
+extending the desktop:
+
+```toml
+[[output]]
+name = "HDMI-A-1"
+mirror = "eDP-1"
+```
+
+A mirror has no workspace or bar of its own. It is scaled to fit its
+resolution without cropping. The setting applies when the monitor is
+plugged in.
+
+### Screen sharing
+
+Install `xdg-desktop-portal-wlr`. The installer adds
+`pzwm-portals.conf`, which sends screen sharing and screenshots to it, so
+browsers, Discord and OBS can share a monitor.
+
+### Desktop profiles
+
+Save where your apps are and bring them back later. Loading puts open
+windows back in place, starts the missing apps and places them as they open.
+
+```sh
+pzwm msg profile save work     # or bind it: "Super+F1" = "profile save work"
+pzwm msg profile load work
+pzwm msg profile list
+```
+
+Profiles are stored in `~/.local/state/pzwm/profiles/`. A profile keeps,
+for each window, the app, workspace, position, size and maximized state, plus
+the view of each workspace and which workspace each monitor shows. Missing
+apps are started with `gtk-launch`, so their app id must match a `.desktop`
+file. To load one at login, add it to `autostart`:
+
+```toml
+[general]
+autostart = ["pzwm msg profile load work"]
+```
+
+### Scripting
+
+`pzwm msg` sends any action from the `[binds]` list to the running pzwm:
+
+```sh
+pzwm msg workspace 3
+pzwm msg fit
+pzwm msg windows           # list windows
+pzwm msg outputs           # list monitors
+```
+
 Useful commands:
 
 ```sh
 pzwm --check-config            # check the config for errors
 journalctl --user -t pzwm -b   # logs
 ```
+
+## Similar projects
+
+See [docs/similar-projects.md](docs/similar-projects.md).
 
 ## Credits
 
@@ -174,6 +290,7 @@ pzwm is built on these open-source projects. Thank you to their authors.
 | [calloop](https://github.com/Smithay/calloop) | event loop | MIT |
 | [winit](https://github.com/rust-windowing/winit) | `--nested` mode | Apache-2.0 |
 | [serde](https://github.com/serde-rs/serde), [toml](https://github.com/toml-rs/toml) | reading the config | MIT or Apache-2.0 |
+| [serde_json](https://github.com/serde-rs/json) | profiles, bar feed | MIT or Apache-2.0 |
 | [tracing](https://github.com/tokio-rs/tracing) | logs | MIT |
 | [anyhow](https://github.com/dtolnay/anyhow) | errors | MIT or Apache-2.0 |
 | [xcursor](https://github.com/esposm03/xcursor-rs) | cursor themes | MIT |
@@ -185,7 +302,8 @@ downloads it when you build.
 
 The programs in [Works with](#works-with) (DMS, waybar, xwayland-satellite
 and others) are separate projects with their own licenses. pzwm only talks
-to them through standard Wayland protocols and does not include their code.
+to them through Wayland protocols and, for the DMS bar, a local socket; it
+does not include their code.
 
 ## License
 
