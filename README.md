@@ -28,6 +28,7 @@ windows wherever you want, and zoom out to see all of them at once.
   (wlr-screencopy).
 - Maximize, fullscreen, pin to screen, half-screen tiling by dragging to an
   edge, magnetic edges, server-side title bars.
+- **pzwm config**: a settings app for everything in the config file.
 - Scriptable through `pzwm msg …`; the config reloads when you save it.
 
 ## Works with
@@ -78,6 +79,9 @@ cd pzwm
 
 `--deps` installs the system libraries first (Arch, Fedora, Debian/Ubuntu,
 openSUSE, Void). If you already have them, run just `./install.sh`.
+
+The settings app needs Python 3.11+ with PyGObject, GTK 4 and libadwaita
+(`--deps` installs them).
 
 Recommended extras:
 `xwayland-satellite grim slurp wl-clipboard xdg-desktop-portal-gtk xdg-desktop-portal-wlr`.
@@ -165,6 +169,27 @@ workspace has its own camera (position and zoom). Switch with
 `Super+Ctrl+1` … `0` or by clicking a workspace in the DMS bar.
 
 ## Config
+
+### Settings app
+
+Open **pzwm config** from your app launcher, or run `pzwm-config`.
+
+It edits `~/.config/pzwm/config.toml` with switches, sliders, color
+pickers and lists instead of text:
+
+- **General**: autostart commands, scale, cursor, X11 apps
+- **Input**: keyboard layouts, key repeat, touchpad, pointer speed
+- **Canvas**: new window size, zoom limits, mouse behaviour, grid
+- **Monitors**: mode, scale, position, mirroring; lists connected monitors
+- **Appearance**, **Animation**, **Minimap**: sizes and colors
+- **Shortcuts** and **Mouse**: your bindings and the built-in ones; add,
+  change or turn off a binding, or press *Record* and the keys
+
+Saving keeps your comments and the order of the file, checks the result
+with `pzwm --check-config` first, and leaves the previous file as
+`config.toml.bak`. pzwm applies the changes right away.
+
+### Config file
 
 The config file is:
 
@@ -272,6 +297,7 @@ Useful commands:
 
 ```sh
 pzwm --check-config            # check the config for errors
+pzwm --check-config FILE       # check another file
 journalctl --user -t pzwm -b   # logs
 ```
 
@@ -291,6 +317,7 @@ pzwm is built on these open-source projects. Thank you to their authors.
 | [winit](https://github.com/rust-windowing/winit) | `--nested` mode | Apache-2.0 |
 | [serde](https://github.com/serde-rs/serde), [toml](https://github.com/toml-rs/toml) | reading the config | MIT or Apache-2.0 |
 | [serde_json](https://github.com/serde-rs/json) | profiles, bar feed | MIT or Apache-2.0 |
+| [PyGObject](https://gitlab.gnome.org/GNOME/pygobject), [GTK](https://gtk.org), [libadwaita](https://gitlab.gnome.org/GNOME/libadwaita) | the pzwm config app (used, not included) | LGPL-2.1-or-later |
 | [tracing](https://github.com/tokio-rs/tracing) | logs | MIT |
 | [anyhow](https://github.com/dtolnay/anyhow) | errors | MIT or Apache-2.0 |
 | [xcursor](https://github.com/esposm03/xcursor-rs) | cursor themes | MIT |
