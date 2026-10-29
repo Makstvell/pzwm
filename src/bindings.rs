@@ -44,6 +44,10 @@ impl State {
             time,
             |state, mods, handle| {
                 if key_state == KeyState::Released {
+                    // Letting go of Super ends a multi-digit window number.
+                    if matches!(handle.modified_sym(), Keysym::Super_L | Keysym::Super_R) {
+                        state.window_chord = None;
+                    }
                     if state.map_popup.as_ref().and_then(|p| p.key) == Some(keycode) {
                         state.map_key_released();
                     }
@@ -95,6 +99,14 @@ impl State {
                     }
                 }
                 match find_bind(&state.config, pressed, sym) {
+                    // A digit bound to a window number may be one of several.
+                    Some(Action::FocusNth(_))
+                        if (Keysym::_0.raw()..=Keysym::_9.raw()).contains(&sym.raw()) =>
+                    {
+                        state.suppressed_keys.push(keycode);
+                        let digit = (sym.raw() - Keysym::_0.raw()) as usize;
+                        FilterResult::Intercept(Some(Action::WindowDigit(digit)))
+                    }
                     Some(action) => {
                         state.suppressed_keys.push(keycode);
                         FilterResult::Intercept(Some(action))
@@ -195,6 +207,12 @@ impl State {
                     self.remember_camera(o);
                 }
                 self.focus_nth(n)
+            }
+            Action::WindowDigit(digit) => {
+                if let Some(o) = &output {
+                    self.remember_camera(o);
+                }
+                self.window_digit(digit)
             }
             Action::MoveWindow(dir) => {
                 if let Some(i) = focused {

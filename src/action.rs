@@ -87,6 +87,8 @@ pub enum Action {
     ToggleMinimap,
     /// Jump to the n-th window (0-based) in the order windows were opened.
     FocusNth(usize),
+    /// Super + a digit: a window number, more digits while Super is held.
+    WindowDigit(usize),
     Workspace(usize),
     MoveToWorkspace(usize),
     NextLayout,
@@ -145,7 +147,8 @@ impl Action {
             "overview" | "zoom-fit" => Self::Overview,
             "home" => Self::Home,
             "minimap" | "toggle-minimap" => Self::ToggleMinimap,
-            "window" => Self::FocusNth(num().filter(|n| (1..=10).contains(n))? - 1),
+            "window" => Self::FocusNth(num().filter(|&n| n >= 1)? - 1),
+            "window-digit" => Self::WindowDigit(num().filter(|&n| n <= 9)?),
             "workspace" => Self::Workspace(num().filter(|n| (1..=10).contains(n))? - 1),
             "move-to-workspace" => {
                 Self::MoveToWorkspace(num().filter(|n| (1..=10).contains(n))? - 1)
@@ -174,6 +177,8 @@ mod tests {
         );
         assert_eq!(Action::parse("workspace 1"), Some(Action::Workspace(0)));
         assert_eq!(Action::parse("window 10"), Some(Action::FocusNth(9)));
+        assert_eq!(Action::parse("window 12"), Some(Action::FocusNth(11)));
+        assert_eq!(Action::parse("window 0"), None);
         assert_eq!(Action::parse("window 0"), None);
         assert_eq!(
             Action::parse("move-to-workspace 10"),

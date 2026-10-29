@@ -106,6 +106,8 @@ pub struct RenderCache {
     preview: ShaderElement,
     /// Cells of the `tile` grid by index; the selection uses `preview`.
     tiles: HashMap<usize, ShaderElement>,
+    /// Outline of the ideal size while a size is dragged.
+    hint: ShaderElement,
     /// Group frames by output and group name.
     groups: HashMap<(String, String), ShaderElement>,
     /// Drawing segments by output, stroke id and segment index.
@@ -213,6 +215,7 @@ pub fn scaled_output_elements<R: PzRenderer>(
             out.push(PzElement::Shader(preview_element(state, rect, os, sh)));
         }
         tile_elements(state, output, os, sh, &mut out);
+        hint_element(state, output, os, sh, &mut out);
     }
 
     // The edge-tiling preview sits right under the window being dragged.
@@ -659,6 +662,47 @@ fn thumbnail_elements<R: PzRenderer>(
             ClippedSurface::new(zoomed, tex_size, clip, sh.clip.clone())
         })
         .collect()
+}
+
+/// The ideal size (see sizehint.rs) as an outline; filled once snapped.
+fn hint_element<R: PzRenderer>(
+    state: &mut State,
+    output: &Output,
+    os: f64,
+    sh: &Shaders,
+    out: &mut Vec<PzElement<R>>,
+) {
+    let Some((rect, snapped)) = state
+        .size_hint
+        .as_ref()
+        .filter(|h| &h.output == output)
+        .map(|h| (h.rect, h.snapped))
+    else {
+        return;
+    };
+    let [r, g, b, _] = state.config.appearance.active_border_end;
+    let uniforms = [
+        (
+            "u_fill",
+            ShaderValue::F4([r, g, b, if snapped { 0.18 } else { 0.04 }]),
+        ),
+        (
+            "u_stroke",
+            ShaderValue::F4([r, g, b, if snapped { 1.0 } else { 0.7 }]),
+        ),
+        (
+            "u_radius",
+            ShaderValue::F1((state.config.appearance.corner_radius as f64 * os) as f32),
+        ),
+        ("u_border", ShaderValue::F1((2.0 * os) as f32)),
+    ];
+    out.push(PzElement::Shader(
+        state
+            .render_cache
+            .hint
+            .update(&sh.rect, phys_rect(rect, os), 1.0, &uniforms)
+            .clone(),
+    ));
 }
 
 /// The `tile` grid: the selected block on top of dim cells.

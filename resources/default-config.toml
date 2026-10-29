@@ -30,6 +30,11 @@ auto_reload = true
 # dmenu-style picker used by `find` and `group add`: reads lines on stdin,
 # prints the chosen one. Empty: rofi, else fuzzel, else wofi.
 picker = ""
+# How Super+1 … 0 (`window N`) count windows on the workspace: "rows"
+# (from the top left, row by row), "rows-rtl" (from the top right),
+# "columns" (column by column) or "opened" (in the order they opened).
+# Hold Super and type more digits for 11, 12, …
+window_numbers = "rows"
 # Save the desktop as the profile "autosave" every 2 minutes and on quit,
 # so it can be put back after a crash: pzwm msg profile load autosave.
 autosave = true
@@ -74,13 +79,21 @@ semantic_zoom = 0.3
 # Zoom or Telegram window) opens beside it; dialog-sized ones open over it.
 place_near_siblings = true
 # Where any other new window opens: "center" (the middle of the view) or
-# "pick" (it waits until you drag out its place; a click puts it at its own
-# size around the click, Escape in the middle). Dialogs and an app's further
-# windows never wait.
+# "pick" (it waits until you drag out its area and takes exactly that area;
+# Escape: the middle). Dialogs and an app's further windows never wait.
 new_window_placement = "center"
 # Cells of the Super+T grid, "COLSxROWS" (up to 12x12): 6x4 makes halves,
 # thirds, quarters and sixths.
 tile_grid = "6x4"
+# How Super+T, Super+[ / ] and edge or corner drops place a window: "zoom"
+# (the camera goes to 100 % first, so the window gets the size in real
+# pixels whatever the zoom was), "pin" (pinned to the screen at 1:1) or
+# "canvas" (at the current zoom).
+tile_mode = "zoom"
+# While an area is dragged out or a window resized, ideal sizes pull it in
+# and show as an outline: the whole screen at 100 %, its halves and quarter,
+# 1280x720, 1920x1080. Hold Alt for a free size.
+size_hints = true
 
 [minimap]
 # Map of the whole workspace with live previews of every window and the
@@ -197,7 +210,7 @@ pinned_accent = "#f59e0b"
 #   move-window <dir>         resize-window <dir>                pan <dir>
 #   snap left|right|up|down   workspace <1-10>   move-to-workspace <1-10>
 #   layout next|<index>       reload-config      quit            vt <1-12>
-#   minimap (toggle)          window <1-10> (n-th window in the order it was opened)
+#   minimap (toggle)          window <N> (the n-th window, see [general] window_numbers)
 #   draw [on|off|undo|clear|hide|color N|color next]
 #   arrange grid|row|column   present [start|stop|next|prev]
 #   profile save|load|delete <name>              profile rename <old> <new>

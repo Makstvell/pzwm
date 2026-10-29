@@ -63,6 +63,9 @@ pub struct General {
     /// dmenu-style picker for `find` (reads lines, prints the chosen one).
     /// Empty: rofi, else fuzzel, else wofi.
     pub picker: String,
+    /// How Super+1 … 0 (`window N`) count windows: "rows" (from the top
+    /// left), "rows-rtl" (from the top right), "columns", "opened".
+    pub window_numbers: String,
     /// Save the desktop as the profile `autosave` every few minutes, so it
     /// can be put back after a crash.
     pub autosave: bool,
@@ -147,6 +150,13 @@ pub struct Canvas {
     pub new_window_placement: String,
     /// Cells of the `tile` grid, "COLSxROWS".
     pub tile_grid: String,
+    /// Ideal sizes (the whole screen at 100 %, halves, …) pull a dragged
+    /// area or a resized window in, see sizehint.rs; Alt held: free size.
+    pub size_hints: bool,
+    /// How tile, snap and edge drops place a canvas window: "zoom" (go to
+    /// 100 % first: real-pixel sizes), "pin" (pin it at 1:1), "canvas"
+    /// (at the current zoom).
+    pub tile_mode: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -369,6 +379,7 @@ impl Default for General {
             scale: 1.0,
             auto_reload: true,
             picker: String::new(),
+            window_numbers: "rows".into(),
             autosave: true,
         }
     }
@@ -429,6 +440,8 @@ impl Default for Canvas {
             place_near_siblings: true,
             new_window_placement: "center".into(),
             tile_grid: "6x4".into(),
+            size_hints: true,
+            tile_mode: "zoom".into(),
         }
     }
 }

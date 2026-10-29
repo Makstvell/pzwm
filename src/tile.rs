@@ -254,7 +254,11 @@ impl State {
         let gap = self.config.appearance.gaps as f64;
         let rect = cells_rect(area, gap, (t.cols, t.rows), span(t.anchor, t.end));
         if let Some(idx) = self.index_of_id(t.window) {
-            if self.windows[idx].placement != Placement::Canvas {
+            // A pinned window stays pinned; maximized and fullscreen come back first.
+            if matches!(
+                self.windows[idx].placement,
+                Placement::Maximized | Placement::Fullscreen
+            ) {
                 self.restore(idx);
             }
         }

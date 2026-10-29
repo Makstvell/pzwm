@@ -573,6 +573,73 @@ impl State {
         if has(&[ResizeEdge::Top, ResizeEdge::TopLeft, ResizeEdge::TopRight]) {
             h -= d.y;
         }
+        // Ideal sizes pull the edges being dragged, see sizehint.rs.
+        let axes = (
+            has(&[
+                ResizeEdge::Left,
+                ResizeEdge::Right,
+                ResizeEdge::TopLeft,
+                ResizeEdge::TopRight,
+                ResizeEdge::BottomLeft,
+                ResizeEdge::BottomRight,
+            ]),
+            has(&[
+                ResizeEdge::Top,
+                ResizeEdge::Bottom,
+                ResizeEdge::TopLeft,
+                ResizeEdge::TopRight,
+                ResizeEdge::BottomLeft,
+                ResizeEdge::BottomRight,
+            ]),
+        );
+        self.size_hint = None;
+        if let (false, Some(output)) = (self.size_hints_off(), self.output_of(idx)) {
+            let title = self.title_height(&self.windows[idx]);
+            let ideals = self.ideal_sizes(&output);
+            let (frame, hint) = crate::sizehint::pull(
+                Size::from((w, h + title)),
+                &ideals,
+                axes,
+                crate::sizehint::SNAP_PX / scale,
+                crate::sizehint::SHOW_PX / scale,
+            );
+            w = frame.w;
+            h = frame.h - title;
+            if let Some((ideal, snapped)) = hint {
+                // The ideal frame where the resized one would be: the edges
+                // not dragged stay where they started.
+                let iw = if axes.0 { ideal.size.w } else { w };
+                let ih = if axes.1 { ideal.size.h - title } else { h };
+                let x = if has(&[
+                    ResizeEdge::Left,
+                    ResizeEdge::TopLeft,
+                    ResizeEdge::BottomLeft,
+                ]) {
+                    start_pos.x + start_size.w - iw
+                } else {
+                    start_pos.x
+                };
+                let y = if has(&[ResizeEdge::Top, ResizeEdge::TopLeft, ResizeEdge::TopRight]) {
+                    start_pos.y + start_size.h - ih
+                } else {
+                    start_pos.y
+                };
+                let frame =
+                    Rectangle::new(Point::from((x, y - title)), Size::from((iw, ih + title)));
+                let rect = if self.windows[idx].placement == Placement::Pinned {
+                    frame
+                } else {
+                    let cam = self.camera(&output);
+                    Rectangle::new(cam.to_screen(frame.loc), frame.size.upscale(cam.zoom))
+                };
+                self.size_hint = Some(crate::sizehint::SizeHint {
+                    output,
+                    rect,
+                    ideal,
+                    snapped,
+                });
+            }
+        }
         let size = Size::from((w.max(MIN_W).round() as i32, h.max(MIN_H).round() as i32));
         let m = &mut self.windows[idx];
         m.anchor = Some(ResizeAnchor {
@@ -605,6 +672,7 @@ impl State {
                 }
             }
             Some(Interaction::Resize { id, .. }) => {
+                self.finish_size_hint();
                 if let Some(idx) = self.index_of_id(id) {
                     if let Some(t) = self.windows[idx].window.toplevel() {
                         t.with_pending_state(|s| s.states.unset(ToplevelState::Resizing));

@@ -57,9 +57,17 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
   `Super+Ctrl` + left drag) and the next window fills it;
   `Super+Shift+Return` does the same and starts a terminal there.
 - **Pick mode** (`[canvas] new_window_placement = "pick"`): every new
-  window waits until you drag out its place; a click puts it at its own
-  size around the click, Escape in the middle. Dialogs and an app's
-  further windows skip it and open by their parent.
+  window waits until you drag out its area and then takes exactly that
+  area; Escape puts it in the middle. Dialogs and an app's further
+  windows skip it and open by their parent.
+- **Size hints**: while you drag out an area or resize a window, ideal
+  sizes pull it in and show as an outline: the whole screen at 100 %
+  (the app's pixels match the screen's), its halves and quarter, 1280 ×
+  720, 1920 × 1080. A notification names the size; hold Alt for a free
+  size.
+- **Window numbers by place**: `Super+1` … `Super+0` count the windows
+  from the top left (or top right, by columns, or in opening order); hold
+  `Super` and type more digits for 11, 12 and on.
 - **An app's windows stay together**: a second window of an app that is
   already open (Zoom, Telegram, a browser) opens beside the first, and
   dialog-sized ones over it, the way KDE Plasma places them.
@@ -191,7 +199,7 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 | Window | Opens |
 |---|---|
 | after you picked an area | filling the area: `Super+O`, then drag a rectangle (Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
-| any other window, with `new_window_placement = "pick"` | nowhere yet: it waits until you drag out its place (its outline follows the cursor); a click puts it at its own size around the click, Escape in the middle of the view. Several new windows wait in turn |
+| any other window, with `new_window_placement = "pick"` | nowhere yet: it waits until you drag out its area (the cursor is a crosshair) and then takes exactly that area, size included; a click without dragging keeps it waiting; Escape puts it in the middle of the view. Several new windows wait in turn |
 | a dialog (it has a parent window) | centered over its parent |
 | another window of an app that is already on the workspace | beside that window (right, else below, left, above: the first free side), the camera pans to show it; a window at most 60 % of the other one's size opens over it, like a dialog |
 | anything else (`new_window_placement = "center"`, the default) | in the middle of the view, 90 % × 90 % of the screen |
@@ -211,10 +219,56 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
   middle. `pzwm msg windows --json` marks waiting windows with
   `"awaiting_pick": true`.
 
+### Size hints
+
+While you drag out an area (`Super+O`, pick mode) or resize a window by
+an edge, the nearest **ideal size** shows as an outline once you get
+close, and within about 24 screen pixels the size snaps onto it. A
+notification then names it, for example `1687 × 940: the whole screen at
+100 %`.
+
+| Ideal size | Why |
+|---|---|
+| the whole screen at 100 % | fills the screen without zooming: the app's pixels are the screen's (with the monitor's scale) |
+| half the screen, side by side / one above the other | two windows next to each other at 100 % |
+| a quarter of the screen | four windows at 100 % |
+| 1280 × 720, 1920 × 1080 | common video and app sizes |
+
+Sizes are logical pixels, so they follow the monitor's resolution and
+scale. Hold `Alt` while dragging for a free size; `[canvas] size_hints =
+false` turns the hints off.
+
+### Window numbers
+
+`Super+1` … `Super+9`, `Super+0` (window 10) jump to a window of the
+workspace by number. Keep `Super` held and type more digits for 11, 12
+and on: `Super`+`1`, `2` is window 12 (if there are fewer, the last digit
+alone counts). `[general] window_numbers` sets the counting:
+
+| `window_numbers` | Counting |
+|---|---|
+| `"rows"` (default) | rows from the top, each left to right |
+| `"rows-rtl"` | rows from the top, each right to left |
+| `"columns"` | columns from the left, each top to bottom |
+| `"opened"` | the order the windows opened in |
+
+Windows whose tops are within half a window of each other count as one
+row. From scripts: `pzwm msg window 12`.
+
 ## Putting windows on the screen: tile grid, halves, corners
 
 The windows still live on the canvas; these place one on part of what the
-screen shows now, at the current zoom.
+screen shows. So that the result does not depend on how far you zoomed,
+`[canvas] tile_mode` decides how:
+
+| `tile_mode` | What happens |
+|---|---|
+| `"zoom"` (default) | the camera first goes to 100 % (the middle of the screen stays put), then the window gets the cells' size in real pixels: text at 1:1, sharp at the monitor's scale, and windows tiled one after another fit together |
+| `"pin"` | the window is pinned to the screen at 1:1 on those cells; the canvas moves under it |
+| `"canvas"` | at the current zoom, as before (zoomed out, the window gets a bigger logical size) |
+
+A pinned window stays pinned when tiled or snapped, and `Super+P` keeps a
+window where it is and as big as it looks, in both directions.
 
 | How | Result |
 |---|---|
@@ -307,7 +361,7 @@ or in the `[binds]` and `[mouse]` sections of the config.
 |---|---|
 | `Super+arrows`, `Super+H` / `J` / `K` | focus the window in that direction |
 | `Alt+Tab` / `Alt+Shift+Tab` | next / previous window |
-| `Super+1` … `Super+0` | go to window 1 … 10, in the order they were opened |
+| `Super+1` … `Super+0` | go to window 1 … 10, counted from the top left (`[general] window_numbers`); hold `Super` and type more digits for 11, 12, … |
 | `Super+Ctrl+1` … `0` | go to workspace 1 … 10 |
 | `Super+Shift+1` … `0` | move the window to workspace 1 … 10 |
 
@@ -384,9 +438,9 @@ the old settings and shows a notification.
 
 | Section | Controls |
 |---|---|
-| `[general]` | autostart commands, scale, cursor, X11 apps, systemd session, auto reload |
+| `[general]` | autostart commands, scale, cursor, X11 apps, systemd session, auto reload, `window_numbers` |
 | `[input]` | keyboard layouts (at most 4), XKB options, key repeat, touchpad, pointer speed |
-| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size, `new_window_placement` (`center`/`pick`), `place_near_siblings`, `tile_grid` |
+| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size, `new_window_placement` (`center`/`pick`), `place_near_siblings`, `tile_grid`, `tile_mode`, `size_hints` |
 | `[[output]]` | one block per monitor: mode, scale, position, mirror, disable |
 | `[appearance]` | gaps, borders, corners, title bars, shadows, colors (`"#RRGGBB"` or `"#RRGGBBAA"`) |
 | `[animation]` | animations on/off and their length |
@@ -437,7 +491,7 @@ triggers: `left`, `right`, `middle`, `back`, `forward`, `scroll`.
 | `snap left\|right\|up\|down` | left / right (again: ⅓, ⅔), maximize, restore |
 | `tile [left\|right\|up\|down\|grow <dir>\|apply\|cancel]` | the tile grid, see [Putting windows on the screen](#putting-windows-on-the-screen-tile-grid-halves-corners) |
 | `workspace <1-10>`, `move-to-workspace <1-10>` | workspaces |
-| `window <1-10>` | the n-th window in the order it was opened |
+| `window <N>` | the n-th window, counted as `[general] window_numbers` says (no upper limit) |
 | `profile save\|load\|delete <name>`, `profile rename <old> <new>` | [desktop profiles](#desktop-profiles) |
 | `find` | search windows, groups and bookmarks |
 | `camera back\|forward` | camera history |

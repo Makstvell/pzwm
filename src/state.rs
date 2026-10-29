@@ -230,6 +230,10 @@ pub struct State {
     pub tile: Option<crate::tile::TileMode>,
     /// Last `snap left|right`: window, side, share step, when; see tile.rs.
     pub last_snap: Option<(u64, crate::action::Dir, usize, Instant)>,
+    /// Number typed so far with Super held (Super+1, 2 = window 12), see numbering.rs.
+    pub window_chord: Option<(usize, Instant)>,
+    /// Ideal size shown while a size is dragged, see sizehint.rs.
+    pub size_hint: Option<crate::sizehint::SizeHint>,
     /// When `scratchpad` last started its app, so a double press starts one.
     pub scratchpad_spawned: Option<Instant>,
     /// The running `present` show, see present.rs.
@@ -416,6 +420,8 @@ impl State {
             area: Default::default(),
             tile: None,
             last_snap: None,
+            window_chord: None,
+            size_hint: None,
             scratchpad_spawned: None,
             presentation: None,
             draw: crate::draw::Drawing::load(),

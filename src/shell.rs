@@ -930,21 +930,40 @@ impl State {
         let Some(view) = self.view(&self.windows[idx], &output) else {
             return;
         };
+        // Pinned windows show at 1:1 and canvas ones at the zoom: resize so
+        // the window keeps the place and size it has on screen either way.
+        let title = self.title_height(&self.windows[idx]);
+        let frame = self.frame_rect(&self.windows[idx], &view);
         match self.windows[idx].placement {
             Placement::Canvas => {
                 let m = &mut self.windows[idx];
                 m.placement = Placement::Pinned;
-                m.pos = view.origin;
+                m.pos = Point::from((frame.loc.x, frame.loc.y + title));
                 m.output = Some(output.name());
+                if (view.scale - 1.0).abs() > 0.01 {
+                    let size = Size::from((
+                        frame.size.w.round() as i32,
+                        (frame.size.h - title).round().max(1.0) as i32,
+                    ));
+                    self.configure(idx, Some(size), false, false);
+                }
             }
             Placement::Pinned => {
                 let cam = self.camera(&output);
                 let ws = self.output_ws(&output);
+                let top_left = cam.to_canvas(frame.loc);
                 let m = &mut self.windows[idx];
                 m.placement = Placement::Canvas;
-                m.pos = cam.to_canvas(view.origin);
+                m.pos = Point::from((top_left.x, top_left.y + title));
                 m.output = None;
                 m.ws = ws;
+                if (cam.zoom - 1.0).abs() > 0.01 {
+                    let size = Size::from((
+                        (frame.size.w / cam.zoom).round() as i32,
+                        (frame.size.h / cam.zoom - title).round().max(1.0) as i32,
+                    ));
+                    self.configure(idx, Some(size), false, false);
+                }
             }
             Placement::Maximized | Placement::Fullscreen => {}
         }

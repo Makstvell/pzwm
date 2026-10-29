@@ -64,6 +64,31 @@ impl State {
         self.queue_redraw(&output);
     }
 
+    /// Takes the camera to 100 % zoom, keeping the middle of the screen
+    /// where it is, so what is placed next gets real-pixel sizes.
+    pub fn camera_to_full_scale(&mut self, output: &Output) {
+        let ws = self.output_ws(output);
+        let cam = self.workspace(ws).target();
+        if (cam.zoom - 1.0).abs() < 0.001 {
+            return;
+        }
+        let center = self
+            .output_geometry(output)
+            .size
+            .to_f64()
+            .to_point()
+            .downscale(2.0);
+        let target = Camera {
+            pos: cam.to_canvas(center) - center,
+            zoom: 1.0,
+        };
+        self.remember_camera(output);
+        let dur = self.camera_duration();
+        self.workspace_mut(ws)
+            .animate_to(target, dur, Instant::now());
+        self.queue_redraw(output);
+    }
+
     /// A canvas window shown at under `SMALL_SHARE` of the screen both ways
     /// at the camera's target zoom: too small to read.
     pub fn too_small_to_use(&self, idx: usize) -> bool {
@@ -215,10 +240,10 @@ impl State {
         }
     }
 
-    /// Jumps to the `n`-th window (0-based) in launch order, like clicking
-    /// it on the minimap.
+    /// Jumps to the `n`-th window (0-based) by `[general] window_numbers`,
+    /// see numbering.rs.
     pub fn focus_nth(&mut self, n: usize) {
-        if let Some(&id) = self.launch_order().get(n) {
+        if let Some(&id) = self.numbered_windows().get(n) {
             self.focus_and_center(id);
         }
     }
@@ -415,13 +440,41 @@ impl State {
         )
     }
 
-    /// Puts a canvas window's frame onto a screen rectangle at the current zoom.
+    /// Puts a window's frame onto a screen rectangle (tile grid, snap, edge
+    /// and corner drops). By `[canvas] tile_mode`: "zoom" first takes the
+    /// camera to 100 %, so the window gets the rectangle's size in real
+    /// pixels whatever the zoom was; "pin" pins it there at 1:1; "canvas"
+    /// keeps the zoom. A pinned window stays pinned there at 1:1.
     pub fn place_in_screen_rect(
         &mut self,
         idx: usize,
         output: &Output,
         rect: Rectangle<f64, Logical>,
     ) {
+        if self.windows[idx].placement == Placement::Canvas {
+            match self.config.canvas.tile_mode.as_str() {
+                "canvas" => {}
+                "pin" => {
+                    let m = &mut self.windows[idx];
+                    m.placement = Placement::Pinned;
+                    m.output = Some(output.name());
+                }
+                _ => self.camera_to_full_scale(output),
+            }
+        }
+        if self.windows[idx].placement == Placement::Pinned {
+            let title = self.title_height(&self.windows[idx]);
+            let m = &mut self.windows[idx];
+            m.pos = Point::from((rect.loc.x, rect.loc.y + title));
+            m.output = Some(output.name());
+            let size = Size::from((
+                rect.size.w.round() as i32,
+                (rect.size.h - title).round().max(1.0) as i32,
+            ));
+            self.configure(idx, Some(size), false, false);
+            self.queue_redraw_all();
+            return;
+        }
         let ws = self.output_ws(output);
         let cam = self.workspace(ws).target();
         let title = self.title_height(&self.windows[idx]);

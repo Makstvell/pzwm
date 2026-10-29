@@ -2,8 +2,8 @@
 //! - an **area** the user drags out on the canvas (`area`, Super+O, or
 //!   Super+Ctrl + left drag): the next window that opens fills it;
 //! - with `[canvas] new_window_placement = "pick"` every new window waits,
-//!   hidden, until its place is dragged out (a click: its own size around
-//!   the click, Escape: the middle of the view);
+//!   hidden, until its area is dragged out and then takes exactly that
+//!   area (Escape: the middle of the view);
 //! - next to a **sibling**: a new window of an app that already has one on
 //!   the workspace opens beside it (small ones, like dialogs, over it), the
 //!   way KDE keeps an app's windows together.
@@ -181,7 +181,7 @@ impl State {
                 "notify-send -a pzwm -t 4000 \
                  -h string:x-canonical-private-synchronous:pzwm-pick {} {}",
                 quote(&format!("Place {app}")),
-                quote("Drag its area · click: its size here · Esc: the middle"),
+                quote("Drag out its area · Esc: the middle"),
             ));
             self.queue_redraw_all();
             return;
@@ -229,17 +229,6 @@ impl State {
         }
     }
 
-    /// Frame size of the window being placed, canvas units.
-    fn picked_frame_size(&self) -> Option<Size<f64, Logical>> {
-        self.picked_frame_size_of(self.area.window?)
-    }
-
-    fn picked_frame_size_of(&self, id: u64) -> Option<Size<f64, Logical>> {
-        let m = &self.windows[self.index_of_id(id)?];
-        let size = m.size();
-        Some(Size::from((size.w, size.h + self.title_height(m))))
-    }
-
     fn set_pending_area(&mut self, ws: usize, rect: Rectangle<f64, Logical>) {
         self.area.pending = Some(PendingArea {
             ws,
@@ -264,21 +253,69 @@ impl State {
     }
 
     /// The drag that picks the area ended at the cursor.
-    pub fn area_drag_finished(&mut self, output: &Output, ws: usize, start: Point<f64, Logical>) {
+    /// The area from `start` to the cursor, pulled onto a nearby ideal
+    /// size (see sizehint.rs); keeps the hint to draw up to date.
+    fn dragged_area(
+        &mut self,
+        output: &Output,
+        start: Point<f64, Logical>,
+    ) -> Rectangle<f64, Logical> {
         let cam = self.camera(output);
         let end = cam.to_canvas(self.cursor_local(output));
-        let rect = span(start, end);
+        let raw = span(start, end);
+        if self.size_hints_off() {
+            self.size_hint = None;
+            return raw;
+        }
+        let ideals = self.ideal_sizes(output);
+        let (size, hint) = crate::sizehint::pull(
+            raw.size,
+            &ideals,
+            (true, true),
+            crate::sizehint::SNAP_PX / cam.zoom,
+            crate::sizehint::SHOW_PX / cam.zoom,
+        );
+        // Grow away from where the drag started, like the plain rectangle.
+        let anchored = |s: Size<f64, Logical>| {
+            let x = if end.x >= start.x {
+                start.x
+            } else {
+                start.x - s.w
+            };
+            let y = if end.y >= start.y {
+                start.y
+            } else {
+                start.y - s.h
+            };
+            Rectangle::new(Point::from((x, y)), s)
+        };
+        self.size_hint = hint.map(|(ideal, snapped)| {
+            let r = anchored(ideal.size);
+            crate::sizehint::SizeHint {
+                output: output.clone(),
+                rect: Rectangle::new(cam.to_screen(r.loc), r.size.upscale(cam.zoom)),
+                ideal,
+                snapped,
+            }
+        });
+        anchored(size)
+    }
+
+    pub fn area_drag_finished(&mut self, output: &Output, ws: usize, start: Point<f64, Logical>) {
+        let cam = self.camera(output);
+        let rect = self.dragged_area(output, start);
+        self.finish_size_hint();
         let spawn = self.area.spawn.take();
         self.area.selecting = false;
         let small = rect.size.w * cam.zoom < MIN_AREA_PX || rect.size.h * cam.zoom < MIN_AREA_PX;
-        if let Some(id) = self.area.window.take() {
-            // A click keeps the window's own size, centered on the click.
-            let rect = match (small, self.picked_frame_size_of(id)) {
-                (true, Some(size)) => {
-                    Rectangle::new((end.x - size.w / 2.0, end.y - size.h / 2.0).into(), size)
-                }
-                _ => rect,
-            };
+        if let Some(id) = self.area.window {
+            // A click or a tiny drag is no area: the window keeps waiting.
+            if small {
+                self.area.selecting = true;
+                self.cursor_override = Some(CursorIcon::Crosshair);
+                return;
+            }
+            self.area.window = None;
             self.show_picked(id, Some((ws, rect)));
             self.pick_next_window();
             return;
@@ -305,18 +342,8 @@ impl State {
         }) = &self.interaction
         {
             if o == output {
-                return Some(to_screen(span(
-                    *start,
-                    cam.to_canvas(self.cursor_local(output)),
-                )));
-            }
-        }
-        // Picking a waiting window's place: its outline follows the cursor.
-        if self.area.selecting && self.interaction.is_none() {
-            if let Some(size) = self.picked_frame_size() {
-                let c = self.cursor_local(output);
-                let s = size.upscale(cam.zoom);
-                return Some(Rectangle::new((c.x - s.w / 2.0, c.y - s.h / 2.0).into(), s));
+                let start = *start;
+                return Some(to_screen(self.dragged_area(output, start)));
             }
         }
         let p = self.area.pending?;
