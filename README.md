@@ -5,7 +5,8 @@
 pzwm is a Wayland compositor (window manager) for Linux, written in Rust on
 top of [Smithay](https://github.com/Smithay/smithay). Windows live on one
 **infinite canvas** that you pan and zoom like a Figma or Miro board. There
-is no tiling grid: put windows anywhere and zoom out to see all of them.
+is no tiling mode: put windows anywhere, zoom out to see all of them, and
+line some up on a grid over the screen when you want to (`Super+T`).
 
 [Українською →](README.uk.md)
 
@@ -20,29 +21,47 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 
 ## Contents
 
-1. [Features](#features)
-2. [Install](#install)
-3. [First steps](#first-steps)
-4. [How it works](#how-it-works)
-5. [Where new windows open](#where-new-windows-open)
-6. [Putting windows on the screen: tile grid, halves, corners](#putting-windows-on-the-screen-tile-grid-halves-corners)
-7. [Shortcuts](#shortcuts)
-8. [Helper apps](#helper-apps)
-9. [Settings app: pzwm config](#settings-app-pzwm-config)
-10. [Configuration file](#configuration-file)
-11. [Workspaces and the bar](#workspaces-and-the-bar)
-12. [Monitors](#monitors)
-13. [Desktop profiles](#desktop-profiles)
-14. [Groups, bookmarks and find](#groups-bookmarks-and-find)
-15. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
-16. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
-17. [Scripting: pzwm msg](#scripting-pzwm-msg)
-18. [Works with](#works-with)
-19. [Troubleshooting](#troubleshooting)
-20. [For developers](#for-developers)
-21. [Similar projects](#similar-projects)
-22. [Credits](#credits)
-23. [License](#license)
+1. [What's new](#whats-new)
+2. [Features](#features)
+3. [Install](#install)
+4. [First steps](#first-steps)
+5. [How it works](#how-it-works)
+6. [Where new windows open](#where-new-windows-open) (size hints, window numbers)
+7. [Putting windows on the screen: tile grid, halves, corners](#putting-windows-on-the-screen-tile-grid-halves-corners)
+8. [Shortcuts](#shortcuts)
+9. [Helper apps](#helper-apps)
+10. [Settings app: pzwm config](#settings-app-pzwm-config)
+11. [Configuration file](#configuration-file)
+12. [Workspaces and the bar](#workspaces-and-the-bar)
+13. [Monitors](#monitors)
+14. [Desktop profiles](#desktop-profiles)
+15. [Groups, bookmarks and find](#groups-bookmarks-and-find)
+16. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
+17. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
+18. [Scripting: pzwm msg](#scripting-pzwm-msg)
+19. [Works with](#works-with)
+20. [Troubleshooting](#troubleshooting)
+21. [For developers](#for-developers)
+22. [Similar projects](#similar-projects)
+23. [Credits](#credits)
+24. [License](#license)
+
+## What's new
+
+| Feature | Keys / option | More |
+|---|---|---|
+| Pick where a new window opens: drag out its area and it takes exactly that area | `Super+O`, `Super+Ctrl` + left drag, `Super+Shift+Return`; every window: `[canvas] new_window_placement = "pick"` | [Where new windows open](#where-new-windows-open) |
+| Windows an app opens by itself (Zoom's meeting window, dialogs) open by the one they came from, and the camera fits them; windows you launch are never put there | `[canvas] place_near_siblings` | [Where new windows open](#where-new-windows-open) |
+| Ideal size: the whole screen without the bar at 100 %; again: back | `Super+Shift+F` (fullscreen moved to `Super+Ctrl+F`) | [Shortcuts](#windows) |
+| Size hints: ideal sizes pull a dragged area or a resized window in and show as an outline | hold `Alt` for a free size; `[canvas] size_hints` | [Size hints](#size-hints) |
+| Tile grid over the screen: drag across cells, any mix of halves, thirds, quarters | `Super+T`; `[canvas] tile_grid` | [Tile grid](#putting-windows-on-the-screen-tile-grid-halves-corners) |
+| Tiling at 100 %: tiled windows get real-pixel sizes whatever the zoom (or are pinned) | `[canvas] tile_mode` | [Tile grid](#putting-windows-on-the-screen-tile-grid-halves-corners) |
+| Snap thirds and corner quarters | `Super+[` / `]` again: ⅓, ⅔; drop in a corner | [Tile grid](#putting-windows-on-the-screen-tile-grid-halves-corners) |
+| Pinning keeps a window's place and visible size; pinned windows stay pinned when tiled | `Super+P` | [Tile grid](#putting-windows-on-the-screen-tile-grid-halves-corners) |
+| Window numbers by place (top left first, or top right, columns, opening order), more than 10 | `Super+1` … `0`, hold `Super` for 11, 12, …; `[general] window_numbers` | [Window numbers](#window-numbers) |
+| Screen sharing in Discord and browsers keeps streaming (ext-image-copy-capture) | | [Screen sharing](#screen-sharing-and-screenshots) |
+| Window rules match apps that set their title late (Chrome, Electron) | `[[rule]]` | [Configuration file](#configuration-file) |
+| Find zooms in on the window it flies to; `Super+G` again expands the group it just collapsed; the Desktop Profiles name field has focus | | [Groups, bookmarks and find](#groups-bookmarks-and-find) |
 
 ## Features
 
@@ -115,7 +134,9 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
   one monitor onto another (a mirror is scaled to fill a TV of another
   resolution, wallpaper included).
 - Screen sharing and screenshots (ext-image-copy-capture and wlr-screencopy,
-  xdg-desktop-portal-wlr).
+  xdg-desktop-portal-wlr), live in Discord, browsers and OBS.
+- System tray icons in the bar (the DankMaterialShell System Tray widget,
+  or waybar's tray), for apps that close to the tray.
 - X11 apps through xwayland-satellite.
 - Taskbars and docks see and control the windows (foreign-toplevel).
 - Monitor tools work live: kanshi, wdisplays, wlr-randr
@@ -181,9 +202,13 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 2. **Start it for real**: log out and pick **pzwm** in your login screen
    (GDM, SDDM, greetd, ly…), or run `pzwm-session` from a TTY.
 3. Open a terminal with `Super+Return` and the launcher with `Super+D`.
+   With `new_window_placement = "pick"` the window waits: drag out its
+   area (Escape: the middle).
 4. **Hold `Super` and scroll** to zoom; **hold the middle mouse button and
    drag** to move around.
-5. Open **pzwm config** from the launcher to change settings and shortcuts.
+5. Put windows side by side with `Super+T` (drag across the grid cells),
+   or give one the whole screen at 100 % with `Super+Shift+F`.
+6. Open **pzwm config** from the launcher to change settings and shortcuts.
 
 ## How it works
 
@@ -193,6 +218,8 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 | **Camera** | What part of the canvas a monitor shows: a position and a zoom level. Panning and zooming move the camera, not the windows. |
 | **Workspace** | One of 10 separate canvases. Each monitor shows one workspace; each workspace keeps its own camera. |
 | **Window states** | *Canvas* (normal, moves with the canvas), *pinned* (fixed on screen while the canvas moves under it), *maximized* (fills the screen minus gaps), *fullscreen*. |
+| **Size and zoom** | A window's size is in logical pixels (the monitor's resolution divided by its scale). At 100 % zoom one logical pixel of the app is one of the screen, so text is sharp and true to size; zoomed out the same window just looks smaller. That is why the tile grid, `Super+Shift+F` and the size hints work at 100 %: windows placed one after another fit together whatever zoom you were at. |
+| **New windows** | Open in the middle of the view, or (pick mode) wait until you drag out their area. Dialogs and an app's own further windows open by the window they belong to. See [Where new windows open](#where-new-windows-open). |
 | **Overview** | Zooms out until every window of the workspace is visible; press again to go back. |
 | **Minimap** | A small map of the whole workspace with live previews; click a window to jump to it. |
 | **Bar, launcher, notifications** | Not part of pzwm. They come from other programs such as DankMaterialShell (see [Works with](#works-with)). |
@@ -409,9 +436,9 @@ Open **pzwm config** from your app launcher, or run `pzwm-config`. It edits
 
 | Page | What you can change |
 |---|---|
-| General | autostart commands, scale, cursor theme and size, X11 apps, title bars, desktop autosave |
+| General | autostart commands, scale, cursor theme and size, X11 apps, title bars, desktop autosave, the find picker, how windows are numbered |
 | Input | keyboard layouts and options, key repeat, touchpad, pointer speed |
-| Canvas | size of new windows, where they open (center or pick), side by side placement, tile grid, zoom step and limits, mouse behavior, grid, semantic zoom |
+| Canvas | size of new windows, where they open (center or pick), side by side placement, tile grid and tile mode (100 %, pin, current zoom), size hints, zoom step and limits, mouse behavior, grid, semantic zoom |
 | Monitors | connected monitors with their current mode; mode (picked from what the monitor offers), scale, position, mirroring, disabling |
 | Appearance | gaps, borders, corners, title bars, shadows, colors |
 | Animation | on/off and durations |
@@ -646,7 +673,8 @@ the launcher, or the Profiles page of pzwm config):
    replace it with the current desktop, rename it, or delete it (both ask
    first).
 3. The page talks to the running pzwm directly; there is nothing to
-   Save in the header.
+   Save in the header. When the window opens the name field has focus,
+   so `Super+Shift+P`, a name and Enter save the desktop.
 
 From a terminal or a script:
 
@@ -689,7 +717,11 @@ pzwm msg profile delete office
 - **Find** lists every window (also on other workspaces, minimized or in
   a collapsed group), every group and every bookmark. pzwm draws no text
   itself, so the list is shown by a dmenu-style program: `[general]
-  picker`, else rofi, fuzzel or wofi.
+  picker`, else rofi, fuzzel or wofi. Jumping to a window that would stay
+  a thumbnail (from the overview, say) zooms in on it.
+- **Collapse and expand**: `Super+G` collapses the focused window's group
+  and hands focus to another window; pressed again right away it expands
+  that same group, not the new window's.
 - **Scratchpad**: the first press starts `[scratchpad] command` (foot by
   default; for ghostty use `ghostty --class=pzwm-scratchpad`). Any window
   can become it with a `scratchpad = true` rule.
@@ -764,7 +796,7 @@ the reply. Any [action](#configuration-file) works as a request.
 | `pzwm msg workspace 3`, `pzwm msg fit`, `pzwm msg spawn foot` … | runs the action, prints `ok` |
 | `pzwm msg windows` | one line per window: id, app, workspace, state, position, size, focus |
 | `pzwm msg outputs` | one line per monitor: name, size, position, scale, workspace, camera |
-| `pzwm msg windows --json`, `outputs --json` | the same as JSON (windows also with title, group, hidden) |
+| `pzwm msg windows --json`, `outputs --json` | the same as JSON (windows also with title, group, hidden, scratchpad, `awaiting_pick` for a window waiting for its place) |
 | `pzwm msg subscribe` | stays connected and prints one JSON event per line (see below) |
 | `pzwm msg profile save\|load\|delete\|rename\|list …` | see [Desktop profiles](#desktop-profiles); `profile list --json` gives windows, apps, workspaces and save time |
 | `pzwm msg draw …`, `present …`, `arrange …` | see [Drawing, presentation, arrange](#drawing-presentation-arrange-semantic-zoom); errors are printed, not only notified |
@@ -836,6 +868,12 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | Problem | What to do |
 |---|---|
 | Something does not work | Read the log: `journalctl --user -t pzwm -b` |
+| A new window does not appear | Pick mode is on (`new_window_placement = "pick"`): the window waits for its place. Drag out an area (a click is not enough), or press Escape to put it in the middle |
+| The cursor is a crosshair and clicks do not reach apps | An area is being picked or the tile grid is open: drag, or press Escape |
+| `Super+Shift+F` no longer makes a window fullscreen | It is the ideal size now; fullscreen is `Super+Ctrl+F` (or bind `"Super+Shift+F" = "fullscreen"` in `[binds]`) |
+| A second window of a running app asks for its place | It was launched by you (a bind, the launcher, `pzwm msg spawn`) or is a new process: those always open like a new window. Only windows the app opens by itself go beside their sibling |
+| Tiled windows end up different sizes | Use `[canvas] tile_mode = "zoom"` (the default): tiling goes to 100 % first. With `"canvas"` the size depends on the zoom you tile at |
+| Window numbers are not in the order I expect | Set `[general] window_numbers` to `rows`, `rows-rtl`, `columns` or `opened` |
 | Config changes are ignored | `pzwm --check-config` shows the error; pzwm keeps the old settings until it is fixed |
 | No bar after login | `systemctl --user add-wants pzwm-session.target dms.service`, then log in again |
 | Bar shows no workspaces | Check that `umbriel` is installed (`which umbriel`) and that DMS was started by pzwm |
