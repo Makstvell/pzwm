@@ -90,6 +90,12 @@ fn handle(state: &mut State, request: &str) -> String {
         }
         ["pointer", rest @ ..] => pointer(state, rest),
         ["profile", rest @ ..] => reply(state.profile_command(rest)),
+        ["draw", rest @ ..] => reply(state.draw_command(rest)),
+        ["present", rest @ ..] => reply(state.present_command(rest)),
+        ["arrange", rest @ ..] => match crate::arrange::Arrangement::parse(&rest.join(" ")) {
+            Some(how) => reply(state.arrange(how)),
+            None => "error: usage: arrange grid | row | column".into(),
+        },
         ["reload"] => match state.reload_config() {
             Ok(()) => "ok: config reloaded".into(),
             Err(err) => format!("error: {err}"),

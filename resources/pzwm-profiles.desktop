@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Desktop Profiles
+GenericName=Save and restore window layouts
+Comment=Save, load, rename and delete pzwm desktop profiles
+Exec=pzwm-config --page profiles
+Icon=view-grid-symbolic
+Terminal=false
+Categories=Settings;DesktopSettings;GTK;
+Keywords=profile;layout;session;restore;windows;pzwm;
+OnlyShowIn=pzwm;
+StartupNotify=true

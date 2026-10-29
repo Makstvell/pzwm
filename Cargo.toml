@@ -32,6 +32,7 @@ toml = "0.8"
 xcursor = "0.3"
 anyhow = "1"
 calloop = { version = "0.14", features = ["signals"] }
+png = "0.17"
 
 [profile.release]
 lto = "thin"

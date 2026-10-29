@@ -52,12 +52,21 @@ struct SavedOutput {
     ws: usize,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct Profile {
     windows: Vec<SavedWindow>,
     cameras: Vec<SavedCamera>,
     outputs: Vec<SavedOutput>,
+    /// Drawings on the canvas; profiles saved before drawing existed have
+    /// none, and loading them keeps the current drawings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    drawings: Option<Vec<crate::draw::SavedStroke>>,
 }
+
+/// Name of the profile `[general] autosave` keeps up to date.
+pub const AUTOSAVE: &str = "autosave";
+/// How often the autosave profile is written.
+pub const AUTOSAVE_EVERY: Duration = Duration::from_secs(120);
 
 /// Windows of a loaded profile still waiting for their app to open them.
 #[derive(Debug, Default)]
@@ -141,13 +150,34 @@ fn assign(saved: &[SavedWindow], open: &[String]) -> (Vec<(usize, usize)>, Vec<u
 }
 
 impl State {
-    /// Handles `profile save|load NAME` and `profile list`.
+    /// Handles `profile save|load|delete NAME`, `profile rename OLD NEW`
+    /// and `profile list [--json]`.
     pub fn profile_command(&mut self, args: &[&str]) -> Result<String, String> {
         match args {
             ["save", name] => self.profile_save(name),
             ["load", name] => self.profile_load(name),
+            ["delete", name] => profile_delete(name),
+            ["rename", old, new] => profile_rename(old, new),
             ["list"] => Ok(profile_list()),
-            _ => Err("usage: profile save NAME | load NAME | list".into()),
+            ["list", "--json"] => Ok(profile_list_json()),
+            _ => Err(
+                "usage: profile save NAME | load NAME | delete NAME | rename OLD NEW | list [--json]"
+                    .into(),
+            ),
+        }
+    }
+
+    /// Saves the `autosave` profile, unless there is nothing to save: an
+    /// empty desktop right after login must not overwrite the last one.
+    pub fn autosave_profile(&mut self) {
+        if !self.config.general.autosave {
+            return;
+        }
+        if (0..self.windows.len()).all(|i| self.saved_window(i).is_none()) {
+            return;
+        }
+        if let Err(err) = self.profile_save(AUTOSAVE) {
+            tracing::warn!("autosave: {err}");
         }
     }
 
@@ -180,6 +210,7 @@ impl State {
             windows,
             cameras,
             outputs,
+            drawings: Some(self.draw.saved()),
         };
         let text = serde_json::to_string_pretty(&profile).map_err(|e| e.to_string())?;
         std::fs::create_dir_all(dir()).map_err(|e| format!("{}: {e}", dir().display()))?;
@@ -226,6 +257,10 @@ impl State {
             });
         }
         self.restore_output_workspaces(&profile.outputs);
+        if let Some(drawings) = profile.drawings {
+            self.draw.replace_all(drawings);
+            self.draw.save();
+        }
 
         let ids: Vec<u64> = self.windows.iter().map(|m| m.id).collect();
         let open: Vec<String> = self
@@ -336,6 +371,62 @@ impl State {
         self.place_saved(idx, &w);
         true
     }
+}
+
+fn profile_delete(name: &str) -> Result<String, String> {
+    let path = path(name)?;
+    if !path.exists() {
+        return Err(format!("no profile {name}"));
+    }
+    std::fs::remove_file(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(format!("deleted profile {name}"))
+}
+
+fn profile_rename(old: &str, new: &str) -> Result<String, String> {
+    let (from, to) = (path(old)?, path(new)?);
+    if !from.exists() {
+        return Err(format!("no profile {old}"));
+    }
+    if to.exists() {
+        return Err(format!("profile {new} already exists"));
+    }
+    std::fs::rename(&from, &to).map_err(|e| format!("{}: {e}", from.display()))?;
+    Ok(format!("renamed profile {old} to {new}"))
+}
+
+/// Every profile with what it holds, for the profiles page of pzwm config.
+fn profile_list_json() -> String {
+    let profiles: Vec<serde_json::Value> = profile_list()
+        .lines()
+        .filter_map(|name| {
+            let path = path(name).ok()?;
+            let modified = std::fs::metadata(&path)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |d| d.as_secs());
+            let profile: Profile = std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|t| serde_json::from_str(&t).ok())
+                .unwrap_or_default();
+            let mut apps: Vec<&str> = profile.windows.iter().map(|w| w.app_id.as_str()).collect();
+            apps.sort_unstable();
+            apps.dedup();
+            let mut workspaces: Vec<usize> = profile.windows.iter().map(|w| w.ws + 1).collect();
+            workspaces.sort_unstable();
+            workspaces.dedup();
+            Some(serde_json::json!({
+                "name": name,
+                "windows": profile.windows.len(),
+                "apps": apps,
+                "workspaces": workspaces,
+                "drawings": profile.drawings.as_ref().map_or(0, Vec::len),
+                "modified": modified,
+                "autosave": name == AUTOSAVE,
+            }))
+        })
+        .collect();
+    serde_json::Value::from(profiles).to_string()
 }
 
 fn profile_list() -> String {

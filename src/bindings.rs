@@ -78,6 +78,12 @@ impl State {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::ToggleMinimap));
                 }
+                if state.draw.active && !pressed.logo {
+                    if let Some(action) = pen_key(pressed, sym) {
+                        state.suppressed_keys.push(keycode);
+                        return FilterResult::Intercept(Some(action));
+                    }
+                }
                 match find_bind(&state.config, pressed, sym) {
                     Some(action) => {
                         state.suppressed_keys.push(keycode);
@@ -149,6 +155,20 @@ impl State {
             }
             Action::Scratchpad => self.toggle_scratchpad(),
             Action::Find => self.find(),
+            Action::Draw(args) => {
+                let args: Vec<&str> = args.split_whitespace().collect();
+                let result = self.draw_command(&args);
+                self.notify_result("draw", result, false);
+            }
+            Action::Arrange(how) => {
+                let result = self.arrange(how);
+                self.notify_result("arrange", result, false);
+            }
+            Action::Present(args) => {
+                let args: Vec<&str> = args.split_whitespace().collect();
+                let result = self.present_command(&args);
+                self.notify_result("present", result, args.is_empty() || args == ["start"]);
+            }
             Action::FocusDir(dir) => self.focus_dir(dir),
             Action::FocusNext => self.focus_cycle(true),
             Action::FocusPrev => self.focus_cycle(false),
@@ -383,6 +403,24 @@ impl State {
 /// Quotes `s` as one `sh` word.
 pub fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// Keys the pen takes while drawing is on (without Super, which still
+/// reaches the bindings): Escape, Ctrl+Z, Delete and 1 … 9.
+fn pen_key(mods: Mods, sym: Keysym) -> Option<Action> {
+    let draw = |arg: &str| Some(Action::Draw(arg.to_string()));
+    match sym {
+        Keysym::Escape => draw("off"),
+        Keysym::z if mods.ctrl => draw("undo"),
+        Keysym::Delete => draw("clear"),
+        _ if mods.ctrl || mods.alt => None,
+        _ => {
+            let raw = sym.raw();
+            (Keysym::_1.raw()..=Keysym::_9.raw())
+                .contains(&raw)
+                .then(|| Action::Draw(format!("color {}", raw - Keysym::_0.raw())))
+        }
+    }
 }
 
 fn lowercase(sym: Keysym) -> Keysym {

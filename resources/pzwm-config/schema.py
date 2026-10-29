@@ -42,6 +42,7 @@ PAGES = (
             Option("systemd_session", "Start the systemd session", "bool", "Brings up the bar and portals"),
             Option("auto_reload", "Apply changes on save", "bool"),
             Option("picker", "Picker", "str", "dmenu-style program for Find and new groups; empty: rofi, fuzzel or wofi"),
+            Option("autosave", "Autosave the desktop", "bool", "Profile “autosave” every 2 minutes and on quit, to recover after a crash"),
         ),
     ),
     Page(
@@ -70,6 +71,7 @@ PAGES = (
         (
             Option("new_window_width", "New window width", "float", "Share of the screen", 0.1, 1, 0.05),
             Option("new_window_height", "New window height", "float", "Share of the screen", 0.1, 1, 0.05),
+            Option("semantic_zoom", "Semantic zoom below", "float", "Zoom under which windows become app cards; 0 turns it off", 0, 1, 0.05),
             Option("zoom_step", "Zoom step", "float", "Zoom factor per wheel notch", 1.01, 2, 0.01),
             Option("min_zoom", "Minimum zoom", "float", "", 0.01, 1, 0.01),
             Option("max_zoom", "Maximum zoom", "float", "", 1, 10, 0.1),
@@ -136,10 +138,28 @@ PAGES = (
         "Parallax",
         "preferences-desktop-wallpaper-symbolic",
         (
-            Option("enabled", "Wallpaper parallax", "bool", "The background drifts slowly left and right"),
+            Option("enabled", "Wallpaper parallax", "bool", "The background moves a little behind the canvas"),
             Option("strength", "Strength", "float", "Travel, share of the screen width", 0.01, 0.15, 0.01),
-            Option("period", "Swing time", "float", "Seconds for one full swing", 10, 300, 5),
             Option("follow_camera", "Follow the camera", "bool", "Shift against the canvas while panning"),
+            Option("swing", "Swing", "bool", "Also sway slowly left and right on its own"),
+            Option("period", "Swing time", "float", "Seconds for one full swing", 10, 300, 5),
+        ),
+    ),
+    Page(
+        "draw",
+        "Drawing",
+        "document-edit-symbolic",
+        (
+            Option("width", "Pen width", "float", "Screen pixels at the zoom you draw at", 1, 30, 0.5),
+            Option("colors", "Pen colors", "list", "#RRGGBB each; keys 1 … 9 pick one while drawing"),
+        ),
+    ),
+    Page(
+        "presentation",
+        "Presentation",
+        "x-office-presentation-symbolic",
+        (
+            Option("interval", "Seconds per slide", "float", "0 waits for Super+Page Down", 0, 600, 1),
         ),
     ),
     Page(
@@ -201,6 +221,18 @@ KEY_ACTIONS = (
     "group remove",
     "group toggle",
     "group fit",
+    "draw",
+    "draw hide",
+    "draw undo",
+    "draw clear",
+    "arrange grid",
+    "arrange row",
+    "arrange column",
+    "present",
+    "present next",
+    "present prev",
+    "profile delete work",
+    "spawn pzwm-config --page profiles",
     "reload-config",
     "none",
 )

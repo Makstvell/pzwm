@@ -3,8 +3,10 @@
 //! minimap → snap preview → windows with their frames → group frames →
 //! canvas grid → bottom and background layers (the wallpaper).
 
+mod drawings;
 mod group_frames;
 mod parallax;
+mod semantic;
 pub mod shaders;
 
 use std::{
@@ -104,6 +106,10 @@ pub struct RenderCache {
     preview: ShaderElement,
     /// Group frames by output and group name.
     groups: HashMap<(String, String), ShaderElement>,
+    /// Drawing segments by output, stroke id and segment index.
+    drawings: HashMap<(String, u64, usize), ShaderElement>,
+    /// Semantic-zoom cards by window id.
+    cards: HashMap<u64, ShaderElement>,
 }
 
 impl RenderCache {
@@ -198,12 +204,19 @@ pub fn scaled_output_elements<R: PzRenderer>(
         }
     }
 
+    if let Some(sh) = shaders.as_ref() {
+        drawings::drawing_elements(state, output, os, sh, &mut out);
+    }
+
     // The edge-tiling preview sits right under the window being dragged.
     let mut preview = match (state.snap_preview.clone(), shaders.as_ref()) {
         (Some((o, rect)), Some(sh)) if &o == output => Some(preview_element(state, rect, os, sh)),
         _ => None,
     };
     for i in stacking.into_iter().filter(|&i| Some(i) != fullscreen) {
+        if let Some(sh) = shaders.as_ref() {
+            semantic::card_elements(state, renderer, output, i, os, sh, &mut out);
+        }
         window_elements(
             state,
             renderer,
@@ -276,7 +289,12 @@ fn cursor_elements<R: PzRenderer>(
         return;
     }
     let local = state.cursor_local(output);
-    let icon = match (&state.cursor_override, &state.cursor_status) {
+    // The pen shows a crosshair everywhere it can draw.
+    let pen = state
+        .draw
+        .active
+        .then_some(smithay::input::pointer::CursorIcon::Crosshair);
+    let icon = match (&state.cursor_override.or(pen), &state.cursor_status) {
         (Some(icon), _) => *icon,
         (None, CursorImageStatus::Hidden) => return,
         (None, CursorImageStatus::Named(icon)) => *icon,

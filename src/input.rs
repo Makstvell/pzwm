@@ -550,6 +550,20 @@ impl State {
         if self.map_popup.is_some() && !matches!(under, Under::Minimap) {
             self.close_map_popup();
         }
+        // The pen draws over windows and the canvas, not over the bar or map.
+        let over_canvas = matches!(
+            under,
+            Under::Empty | Under::Decoration { .. } | Under::Surface { layer: None, .. }
+        );
+        if self.draw.active && over_canvas {
+            let shift = self
+                .seat
+                .get_keyboard()
+                .is_some_and(|k| k.modifier_state().shift);
+            if self.start_drawing(button, shift, serial) {
+                return;
+            }
+        }
         if let Some(action) = self.mouse_bind(MouseTrigger::Button(button)) {
             if self.bound_drag(action, &under, button, serial) {
                 return;

@@ -25,6 +25,8 @@ pub struct Config {
     pub canvas: Canvas,
     pub animation: Animation,
     pub parallax: Parallax,
+    pub draw: Draw,
+    pub presentation: Presentation,
     pub appearance: Appearance,
     pub minimap: Minimap,
     pub scratchpad: Scratchpad,
@@ -61,6 +63,9 @@ pub struct General {
     /// dmenu-style picker for `find` (reads lines, prints the chosen one).
     /// Empty: rofi, else fuzzel, else wofi.
     pub picker: String,
+    /// Save the desktop as the profile `autosave` every few minutes, so it
+    /// can be put back after a crash.
+    pub autosave: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -131,6 +136,9 @@ pub struct Canvas {
     /// screen area. Dialogs and fixed-size windows keep their own size.
     pub new_window_width: f64,
     pub new_window_height: f64,
+    /// Below this zoom windows turn into cards with their app icon
+    /// (0 turns it off).
+    pub semantic_zoom: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -172,10 +180,31 @@ pub struct Parallax {
     /// How far the wallpaper may travel, as a share of the screen width
     /// (it is zoomed in by as much so no edge ever shows).
     pub strength: f64,
+    /// Slow left-right swing on its own, independent of the camera.
+    pub swing: bool,
     /// Seconds for one full swing left, right and back.
     pub period: f64,
     /// Also shift a little against the camera when the canvas is panned.
     pub follow_camera: bool,
+}
+
+/// Drawing on the canvas, see draw.rs.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct Draw {
+    /// Pen width in screen pixels at the zoom you draw at.
+    pub width: f64,
+    /// Pen colors; keys 1 … 9 pick one while drawing.
+    #[serde(deserialize_with = "de_colors")]
+    pub colors: Vec<[f32; 4]>,
+}
+
+/// `present`: the camera walks through the workspace's bookmarks.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct Presentation {
+    /// Seconds per slide before moving on by itself; 0 waits for a key.
+    pub interval: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -299,6 +328,8 @@ impl Default for Config {
             canvas: Canvas::default(),
             animation: Animation::default(),
             parallax: Parallax::default(),
+            draw: Draw::default(),
+            presentation: Presentation::default(),
             appearance: Appearance::default(),
             minimap: Minimap::default(),
             scratchpad: Scratchpad::default(),
@@ -327,6 +358,7 @@ impl Default for General {
             scale: 1.0,
             auto_reload: true,
             picker: String::new(),
+            autosave: true,
         }
     }
 }
@@ -382,6 +414,7 @@ impl Default for Canvas {
             resize_corner: 28.0,
             new_window_width: 0.9,
             new_window_height: 0.9,
+            semantic_zoom: 0.3,
         }
     }
 }
@@ -414,11 +447,32 @@ impl Default for Animation {
 impl Default for Parallax {
     fn default() -> Self {
         Self {
-            enabled: false,
-            strength: 0.04,
+            enabled: true,
+            strength: 0.15,
+            swing: false,
             period: 60.0,
             follow_camera: true,
         }
+    }
+}
+
+impl Default for Draw {
+    fn default() -> Self {
+        Self {
+            width: 4.0,
+            colors: [
+                0xf38ba8ff, 0xfab387ff, 0xf9e2afff, 0xa6e3a1ff, 0x89b4faff, 0xcdd6f4ff,
+            ]
+            .into_iter()
+            .map(rgba)
+            .collect(),
+        }
+    }
+}
+
+impl Default for Presentation {
+    fn default() -> Self {
+        Self { interval: 0.0 }
     }
 }
 
@@ -469,6 +523,17 @@ fn de_color<'de, D: serde::Deserializer<'de>>(d: D) -> Result<[f32; 4], D::Error
     parse_color(&s).ok_or_else(|| {
         serde::de::Error::custom(format!("bad color `{s}`, use #RRGGBB or #RRGGBBAA"))
     })
+}
+
+fn de_colors<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<[f32; 4]>, D::Error> {
+    let list = Vec::<String>::deserialize(d)?;
+    list.iter()
+        .map(|s| {
+            parse_color(s).ok_or_else(|| {
+                serde::de::Error::custom(format!("bad color `{s}`, use #RRGGBB or #RRGGBBAA"))
+            })
+        })
+        .collect()
 }
 
 impl Config {

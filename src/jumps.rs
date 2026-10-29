@@ -83,6 +83,14 @@ impl Jumps {
         self.bookmarks[slot].get(name).copied()
     }
 
+    /// Bookmarks of one camera slot, in name order.
+    pub fn slot_bookmarks(&self, slot: usize) -> Vec<(String, Camera)> {
+        self.bookmarks[slot]
+            .iter()
+            .map(|(n, c)| (n.clone(), *c))
+            .collect()
+    }
+
     /// `(slot, name)` of every bookmark.
     pub fn bookmark_names(&self) -> Vec<(usize, String)> {
         (0..WORKSPACES)

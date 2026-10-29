@@ -30,6 +30,9 @@ auto_reload = true
 # dmenu-style picker used by `find` and `group add`: reads lines on stdin,
 # prints the chosen one. Empty: rofi, else fuzzel, else wofi.
 picker = ""
+# Save the desktop as the profile "autosave" every 2 minutes and on quit,
+# so it can be put back after a crash: pzwm msg profile load autosave.
+autosave = true
 
 [input]
 layouts = "us"          # e.g. "us,ua,de"
@@ -64,6 +67,9 @@ resize_margin = 12.0    # invisible grab zone outside window edges for resizing
 resize_corner = 28.0    # how far from a corner the edge zone resizes diagonally
 new_window_width = 0.9   # new windows open at this share of the screen (0.1 .. 1.0);
 new_window_height = 0.9  # dialogs and fixed-size windows keep their own size
+# Semantic zoom: below this zoom windows turn into cards in their app's
+# color with the app icon (0 turns it off).
+semantic_zoom = 0.3
 
 [minimap]
 # Map of the whole workspace with live previews of every window and the
@@ -111,18 +117,31 @@ height = 0.5
 # workspace = 3
 # group = "chat"
 
+# Drawing on the canvas (Super+Shift+D): left drag draws, Shift + left drag
+# draws an arrow, right drag erases. While drawing, 1 … 9 pick a color,
+# Ctrl+Z undoes, Delete clears the workspace, Esc stops.
+[draw]
+width = 4.0     # pen width in screen pixels at the zoom you draw at
+colors = ["#f38ba8", "#fab387", "#f9e2af", "#a6e3a1", "#89b4fa", "#cdd6f4"]
+
+# Presentation (Super+F5): the camera flies through the bookmarks of the
+# workspace, numbered ones first. Super+Page Down / Page Up step.
+[presentation]
+interval = 0.0  # seconds per slide; 0 waits for the key
+
 [animation]
 enabled = true
 window_ms = 130         # open / close / maximize
 camera_ms = 110         # zoom / overview / center; short on purpose, no inertia
 
-# Wallpaper parallax: the background drifts slowly left and right and
-# shifts a little against the camera while the canvas is panned.
+# Wallpaper parallax: the background shifts a little against the camera
+# while the canvas is panned; with swing it also drifts slowly on its own.
 [parallax]
-enabled = false
-strength = 0.04          # travel, share of the screen width (0.01 .. 0.15)
-period = 60.0            # seconds for one full swing
-follow_camera = true
+enabled = true
+strength = 0.15          # travel, share of the screen width (0.01 .. 0.15)
+follow_camera = true     # shift against the canvas while panning
+swing = false            # also sway left and right on its own
+period = 60.0            # seconds for one full swing (with swing = true)
 
 [appearance]
 gaps = 10
@@ -168,6 +187,9 @@ pinned_accent = "#f59e0b"
 #   snap left|right|up|down   workspace <1-10>   move-to-workspace <1-10>
 #   layout next|<index>       reload-config      quit            vt <1-12>
 #   minimap (toggle)          window <1-10> (n-th window in the order it was opened)
+#   draw [on|off|undo|clear|hide|color N|color next]
+#   arrange grid|row|column   present [start|stop|next|prev]
+#   profile save|load|delete <name>              profile rename <old> <new>
 #
 # Built-in mouse behaviour:
 #   middle-drag anywhere (a plain middle click still pastes) .. pan (like a design tool)
@@ -293,6 +315,18 @@ pinned_accent = "#f59e0b"
 "Super+Alt+G" = "group remove"
 "Super+G" = "group toggle"
 "Super+Shift+G" = "group fit"
+# Lay out the focused group (or the workspace) once: grid or row.
+"Super+Shift+A" = "arrange grid"
+"Super+Alt+A" = "arrange row"
+# Draw on the canvas; show or hide the drawings.
+"Super+Shift+D" = "draw"
+"Super+Alt+D" = "draw hide"
+# Presentation through the bookmarks.
+"Super+F5" = "present"
+"Super+Next" = "present next"
+"Super+Prior" = "present prev"
+# Desktop profiles window.
+"Super+Shift+P" = "spawn pzwm-config --page profiles"
 
 "Print" = "spawn mkdir -p ~/Pictures/Screenshots && grim ~/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png"
 "Super+Shift+S" = "spawn grim -g \"$(slurp)\" - | wl-copy"

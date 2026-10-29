@@ -55,6 +55,12 @@ pub enum Action {
     Scratchpad,
     /// Search windows, groups and bookmarks with a picker.
     Find,
+    /// `draw [on|off|undo|clear|hide|color N|color next]`, see draw.rs.
+    Draw(String),
+    /// Line up the focused group (or the workspace) once, see arrange.rs.
+    Arrange(crate::arrange::Arrangement),
+    /// `present [start|stop|next|prev]`: fly through the bookmarks.
+    Present(String),
     /// Center the window and zoom so it fills the visible area.
     FitWindow,
     FocusDir(Dir),
@@ -113,6 +119,9 @@ impl Action {
             "jump-forward" => Self::CameraForward,
             "scratchpad" | "toggle-scratchpad" => Self::Scratchpad,
             "find" | "search" => Self::Find,
+            "draw" => Self::Draw(arg.to_string()),
+            "arrange" => Self::Arrange(crate::arrange::Arrangement::parse(arg)?),
+            "present" | "presentation" => Self::Present(arg.to_string()),
             "focus" => match arg {
                 "next" => Self::FocusNext,
                 "prev" | "previous" => Self::FocusPrev,
@@ -178,6 +187,19 @@ mod tests {
         assert_eq!(Action::parse("jump-forward"), Some(Action::CameraForward));
         assert_eq!(Action::parse("scratchpad"), Some(Action::Scratchpad));
         assert_eq!(Action::parse("find"), Some(Action::Find));
+        assert_eq!(Action::parse("draw"), Some(Action::Draw(String::new())));
+        assert_eq!(
+            Action::parse("draw color 2"),
+            Some(Action::Draw("color 2".into()))
+        );
+        assert_eq!(
+            Action::parse("arrange row"),
+            Some(Action::Arrange(crate::arrange::Arrangement::Row))
+        );
+        assert_eq!(
+            Action::parse("present next"),
+            Some(Action::Present("next".into()))
+        );
     }
 
     #[test]
@@ -190,5 +212,6 @@ mod tests {
         assert_eq!(Action::parse("camera sideways"), None);
         assert_eq!(Action::parse("bookmark"), None);
         assert_eq!(Action::parse("group"), None);
+        assert_eq!(Action::parse("arrange spiral"), None);
     }
 }

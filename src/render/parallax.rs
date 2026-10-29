@@ -1,6 +1,6 @@
-//! Wallpaper parallax: the background layer is zoomed in a little and drifts
-//! slowly left and right, and shifts a bit against the camera while the
-//! canvas is panned.
+//! Wallpaper parallax: the background layer is zoomed in a little, shifts
+//! against the camera while the canvas is panned and, with `swing`, drifts
+//! slowly left and right on its own.
 
 use std::{f64::consts::TAU, time::Duration};
 
@@ -45,13 +45,23 @@ pub fn placement(
     // Two sines at unrelated rates read as a slow, organic sway rather
     // than a metronome; their weights keep the sum within [-1, 1].
     let drift = 0.8 * phase.sin() + 0.2 * (0.37 * phase + 1.3).sin();
-    let (drift_share, follow) = if cfg.follow_camera && screen.w > 0.0 {
-        (DRIFT_SHARE, (-camera_x / (screen.w * CAMERA_SPAN)).tanh())
+    let follows = cfg.follow_camera && screen.w > 0.0;
+    let follow = if follows {
+        (-camera_x / (screen.w * CAMERA_SPAN)).tanh()
     } else {
-        (1.0, 0.0)
+        0.0
+    };
+    let drift_share = match (cfg.swing, follows) {
+        (true, true) => DRIFT_SHARE,
+        (true, false) => 1.0,
+        (false, _) => 0.0,
     };
     let x = (drift * drift_share + follow * (1.0 - drift_share)) * room_x;
-    let y = VERTICAL_SHARE * (0.61 * phase + 0.7).sin() * room_y;
+    let y = if cfg.swing {
+        VERTICAL_SHARE * (0.61 * phase + 0.7).sin() * room_y
+    } else {
+        0.0
+    };
     (1.0 + strength, Point::from((x, y)))
 }
 
@@ -99,6 +109,7 @@ mod tests {
         Parallax {
             enabled: true,
             strength: 0.04,
+            swing: true,
             period: 60.0,
             follow_camera,
         }
@@ -133,6 +144,20 @@ mod tests {
         let (_, left) = placement(&cfg(true), 0.0, -2000.0, screen());
         let (_, right) = placement(&cfg(true), 0.0, 2000.0, screen());
         assert!(left.x > right.x);
+    }
+
+    #[test]
+    fn without_swing_only_the_camera_moves_it() {
+        let still = Parallax {
+            swing: false,
+            ..cfg(true)
+        };
+        let (_, a) = placement(&still, 0.0, 500.0, screen());
+        let (_, b) = placement(&still, 15.0, 500.0, screen());
+        assert_eq!(a, b);
+        assert_eq!(a.y, 0.0);
+        let (_, panned) = placement(&still, 0.0, -500.0, screen());
+        assert!(panned.x > a.x);
     }
 
     #[test]

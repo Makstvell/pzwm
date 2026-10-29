@@ -21,6 +21,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, Gtk  # noqa: E402
 
 from pages import BindingsPage, MonitorsPage, section_page  # noqa: E402
+from profiles_page import ProfilesPage  # noqa: E402
 from schema import PAGES  # noqa: E402
 from tomlpatch import Doc  # noqa: E402
 
@@ -228,6 +229,7 @@ class Window(Adw.ApplicationWindow):
         pages.insert(3, ("output", MonitorsPage(self.store)))
         pages.append(("binds", BindingsPage(self.store, self, "binds")))
         pages.append(("mouse", BindingsPage(self.store, self, "mouse")))
+        pages.append(("profiles", ProfilesPage(self, run_pzwm)))
         for name, page in pages:
             self.stack.add_titled(page, name, page.get_title())
             box = Gtk.Box(spacing=12, margin_top=6, margin_bottom=6, margin_start=6)
@@ -312,6 +314,7 @@ class Window(Adw.ApplicationWindow):
 PAGE_ALIASES = {"monitors": "output", "displays": "output", "shortcuts": "binds"}
 
 
+
 def page_from_args(argv: list[str]) -> tuple[str | None, list[str]]:
     """Takes `--page NAME` out of argv (GTK would reject it)."""
     if "--page" not in argv:
@@ -324,8 +327,16 @@ def page_from_args(argv: list[str]) -> tuple[str | None, list[str]]:
 
 class App(Adw.Application):
     def __init__(self, page: str | None = None):
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
         self.page = page
+
+    def do_command_line(self, command_line) -> int:
+        # A second `pzwm-config --page X` lands here in the running app.
+        page, _rest = page_from_args(command_line.get_arguments())
+        if page:
+            self.page = page
+        self.activate()
+        return 0
 
     def do_activate(self):
         window = self.get_active_window()
@@ -337,8 +348,8 @@ class App(Adw.Application):
                 self._fatal(f"{config_path()}:\n{err}")
                 return
             window = Window(self, store)
-            if self.page:
-                window.show_page(self.page)
+        if self.page:
+            window.show_page(self.page)
         window.present()
 
     def _fatal(self, message: str):
@@ -354,5 +365,6 @@ class App(Adw.Application):
 
 
 if __name__ == "__main__":
-    start_page, args = page_from_args(sys.argv)
-    sys.exit(App(start_page).run(args))
+    # The full argv goes to GApplication: with HANDLES_COMMAND_LINE a running
+    # instance receives it and opens the asked page (see do_command_line).
+    sys.exit(App().run(sys.argv))

@@ -1,24 +1,28 @@
 //! pzwm — an infinite-canvas Wayland compositor.
 
 mod action;
+mod arrange;
 mod backend;
 mod bar;
 mod bindings;
 mod canvas;
 mod config;
 mod cursor;
+mod draw;
 mod events;
 mod find;
 mod gamma;
 mod grabs;
 mod groups;
 mod handlers;
+mod icons;
 mod input;
 mod ipc;
 mod jumps;
 mod minimap;
 mod navigation;
 mod output_management;
+mod present;
 mod profiles;
 mod protocols;
 mod render;
@@ -210,6 +214,7 @@ fn run(nested: bool) -> anyhow::Result<()> {
         start_xwayland_satellite(&mut state);
     }
     start_parallax_tick(&mut state);
+    start_autosave(&mut state);
     let real_session = !nested && state.config.general.systemd_session;
     if real_session {
         start_systemd_session(&state);
@@ -244,6 +249,8 @@ fn run(nested: bool) -> anyhow::Result<()> {
     })?;
 
     info!("shutting down");
+    // Windows are still mapped here: keep this desktop for next time.
+    state.autosave_profile();
     if real_session {
         let _ = Command::new("systemctl")
             .args(["--user", "stop", "pzwm-session.target"])
@@ -261,19 +268,37 @@ fn run(nested: bool) -> anyhow::Result<()> {
 /// second, so this is smooth without waking up on every vblank.
 const PARALLAX_TICK: Duration = Duration::from_millis(33);
 
-/// Repaints the outputs while wallpaper parallax is on (read on every tick,
+/// Repaints the outputs while the wallpaper swings (read on every tick,
 /// so toggling it in the config takes effect without a restart).
 fn start_parallax_tick(state: &mut State) {
     let tick = state
         .loop_handle
         .insert_source(Timer::immediate(), |_, _, state| {
-            if state.config.parallax.enabled {
+            // Without the swing the wallpaper only moves with the camera,
+            // which repaints anyway.
+            let parallax = &state.config.parallax;
+            if parallax.enabled && parallax.swing {
                 state.queue_redraw_all();
             }
             TimeoutAction::ToDuration(PARALLAX_TICK)
         });
     if let Err(err) = tick {
         warn!("parallax timer: {err}");
+    }
+}
+
+/// Keeps the `autosave` profile fresh (`[general] autosave`), so the
+/// desktop can be put back after a crash: `pzwm msg profile load autosave`.
+fn start_autosave(state: &mut State) {
+    let every = profiles::AUTOSAVE_EVERY;
+    let timer = state
+        .loop_handle
+        .insert_source(Timer::from_duration(every), move |_, _, state| {
+            state.autosave_profile();
+            TimeoutAction::ToDuration(every)
+        });
+    if let Err(err) = timer {
+        warn!("autosave timer: {err}");
     }
 }
 

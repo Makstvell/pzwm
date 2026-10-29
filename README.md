@@ -7,6 +7,8 @@ top of [Smithay](https://github.com/Smithay/smithay). Windows live on one
 **infinite canvas** that you pan and zoom like a Figma or Miro board. There
 is no tiling grid: put windows anywhere and zoom out to see all of them.
 
+[Українською →](README.uk.md)
+
 | | |
 |---|---|
 | **Type** | Wayland compositor, floating windows on an infinite canvas |
@@ -23,19 +25,22 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 3. [First steps](#first-steps)
 4. [How it works](#how-it-works)
 5. [Shortcuts](#shortcuts)
-6. [Settings app: pzwm config](#settings-app-pzwm-config)
-7. [Configuration file](#configuration-file)
-8. [Workspaces and the bar](#workspaces-and-the-bar)
-9. [Monitors](#monitors)
-10. [Desktop profiles](#desktop-profiles)
-11. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
-12. [Scripting: pzwm msg](#scripting-pzwm-msg)
-13. [Works with](#works-with)
-14. [Troubleshooting](#troubleshooting)
-15. [For developers](#for-developers)
-16. [Similar projects](#similar-projects)
-17. [Credits](#credits)
-18. [License](#license)
+6. [Helper apps](#helper-apps)
+7. [Settings app: pzwm config](#settings-app-pzwm-config)
+8. [Configuration file](#configuration-file)
+9. [Workspaces and the bar](#workspaces-and-the-bar)
+10. [Monitors](#monitors)
+11. [Desktop profiles](#desktop-profiles)
+12. [Groups, bookmarks and find](#groups-bookmarks-and-find)
+13. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
+14. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
+15. [Scripting: pzwm msg](#scripting-pzwm-msg)
+16. [Works with](#works-with)
+17. [Troubleshooting](#troubleshooting)
+18. [For developers](#for-developers)
+19. [Similar projects](#similar-projects)
+20. [Credits](#credits)
+21. [License](#license)
 
 ## Features
 
@@ -49,9 +54,17 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 - Maximize, fullscreen, pin a window to the screen, half-screen tiling by
   dropping a window on a screen edge, magnetic edges.
 - Overview of all windows, and a minimap with live window previews.
-- **Wallpaper parallax** (`[parallax] enabled = true`): the wallpaper
-  drifts slowly left and right and shifts a little against the camera when
-  you pan the canvas.
+- **Wallpaper parallax** (on by default): the wallpaper shifts a little
+  against the camera when you pan the canvas, like a far-away backdrop.
+  The slow left-right swing on its own is optional (`swing = true`).
+- **Drawing on the canvas** (`Super+Shift+D`): freehand notes and arrows
+  between windows, in canvas coordinates, saved per workspace.
+- **Semantic zoom**: zoomed out below 30 %, windows turn into cards in
+  their app's color with the app icon.
+- **Presentation** (`Super+F5`): the camera flies through the workspace's
+  bookmarks one by one, like slides.
+- **Arrange** (`Super+Shift+A` / `Super+Alt+A`): line up the focused group,
+  or the whole workspace, as a grid or a row, once. Not a tiling mode.
 - **Find** (`Super+/`): search windows, groups and bookmarks by name and
   fly there, with rofi, fuzzel or wofi as the picker.
 - **Camera history**: `Super+,` / `Super+.` go back and forward through
@@ -67,7 +80,9 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 **Desktop**
 - 10 workspaces, shown and switched in the DankMaterialShell bar.
 - Desktop profiles: save where your apps are, restore them later; apps
-  that are not running are started and put back in place.
+  that are not running are started and put back in place. The
+  **Desktop Profiles** window (`Super+Shift+P`) manages them, and the
+  `autosave` profile keeps the last desktop for after a crash.
 - Several monitors with their own mode, scale and position, or mirroring
   one monitor onto another (a mirror is scaled to fill a TV of another
   resolution, wallpaper included).
@@ -79,7 +94,8 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 - Input methods (fcitx5) and drawing tablets with pressure and tilt.
 
 **Setup**
-- **pzwm config**: a settings app for every option, shortcuts included.
+- **pzwm config**: a settings app for every option, shortcuts included,
+  plus the helper launchers **Display Settings** and **Desktop Profiles**.
 - Plain TOML config that applies as soon as you save it.
 - `pzwm msg …` controls the running compositor from scripts, with JSON
   output and an event stream.
@@ -120,6 +136,7 @@ The script builds in release mode and installs with `sudo` into
 | `/usr/local/share/pzwm-config/` | settings app code |
 | `/usr/local/share/applications/pzwm-config.desktop` | **pzwm config** in your app launcher |
 | `/usr/local/share/applications/pzwm-displays.desktop` | **Display Settings** in your app launcher (only under pzwm) |
+| `/usr/local/share/applications/pzwm-profiles.desktop` | **Desktop Profiles** in your app launcher (only under pzwm) |
 | `/usr/share/wayland-sessions/pzwm.desktop` | **pzwm** entry in the login screen |
 | `/usr/local/lib/systemd/user/pzwm-session.target` | starts the bar, portals and other session services |
 | `/usr/local/share/xdg-desktop-portal/pzwm-portals.conf` | which portal handles screen sharing |
@@ -204,6 +221,18 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | `Super+Shift+G` | fit the whole group on screen |
 | `Super+Alt` + left drag | move the whole group |
 
+### Draw, present, arrange
+
+| Shortcut | Action |
+|---|---|
+| `Super+Shift+D` | pen on / off |
+| while the pen is on: left drag / `Shift` + left drag / right drag | draw / draw an arrow / erase strokes |
+| while the pen is on: `1` … `9`, `Ctrl+Z`, `Delete`, `Esc` | pick a color, undo, clear the workspace, pen off |
+| `Super+Alt+D` | hide / show the drawings |
+| `Super+F5` | start / end the presentation through the bookmarks |
+| `Super+Page Down` / `Super+Page Up` | next / previous slide |
+| `Super+Shift+A` / `Super+Alt+A` | arrange the group (or the workspace) as a grid / a row |
+
 ### Focus and workspaces
 
 | Shortcut | Action |
@@ -225,8 +254,24 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | `Super+Shift+S` | screenshot of an area to the clipboard |
 | `Super+Shift+Space` | next keyboard layout |
 | volume, mute, brightness, media keys | wpctl, brightnessctl, playerctl |
+| `Super+Shift+P` | **Desktop Profiles** window |
 | `Super+Shift+R` | reload the config |
 | `Super+Ctrl+Q` | quit pzwm |
+
+## Helper apps
+
+pzwm comes with three launcher entries. All three are the same program,
+`pzwm-config`, opened on a different page; they are listed in your app
+launcher (rofi, fuzzel, DMS) and the last two only show up under pzwm.
+
+| Name in the launcher | Command | What it is for |
+|---|---|---|
+| **pzwm config** | `pzwm-config` | every setting and shortcut, see [below](#settings-app-pzwm-config) |
+| **Display Settings** | `pzwm-config --page monitors` | resolution, refresh rate, scale, position and mirroring of monitors, see [Monitors](#monitors) |
+| **Desktop Profiles** | `pzwm-config --page profiles`, `Super+Shift+P` | save, load, rename and delete desktop profiles, see [Desktop profiles](#desktop-profiles) |
+
+`--page` takes any page name (`general`, `canvas`, `parallax`, `draw`,
+`shortcuts`, …). If the app is already open, it switches to that page.
 
 ## Settings app: pzwm config
 
@@ -235,16 +280,19 @@ Open **pzwm config** from your app launcher, or run `pzwm-config`. It edits
 
 | Page | What you can change |
 |---|---|
-| General | autostart commands, scale, cursor theme and size, X11 apps, title bars |
+| General | autostart commands, scale, cursor theme and size, X11 apps, title bars, desktop autosave |
 | Input | keyboard layouts and options, key repeat, touchpad, pointer speed |
-| Canvas | size of new windows, zoom step and limits, mouse behavior, grid |
+| Canvas | size of new windows, zoom step and limits, mouse behavior, grid, semantic zoom |
 | Monitors | connected monitors with their current mode; mode (picked from what the monitor offers), scale, position, mirroring, disabling |
 | Appearance | gaps, borders, corners, title bars, shadows, colors |
 | Animation | on/off and durations |
-| Parallax | wallpaper drift on/off, strength, swing time, following the camera |
+| Parallax | on/off, strength, following the camera, the swing on its own (off by default) and its time |
+| Drawing | pen width and colors |
+| Presentation | seconds per slide (0: by key) |
 | Minimap | position, size, colors |
 | Shortcuts | your key bindings and the built-in ones: add, change, turn off, or press *Record* and the keys |
 | Mouse | mouse bindings (`Super+scroll`, `Super+left`, …) |
+| Profiles | desktop profiles: save the desktop under a name, load, replace, rename, delete; acts at once, no Save needed |
 
 How saving works:
 - only the changed lines are rewritten, so your comments and the order of
@@ -274,7 +322,9 @@ the old settings and shows a notification.
 | `[[output]]` | one block per monitor: mode, scale, position, mirror, disable |
 | `[appearance]` | gaps, borders, corners, title bars, shadows, colors (`"#RRGGBB"` or `"#RRGGBBAA"`) |
 | `[animation]` | animations on/off and their length |
-| `[parallax]` | wallpaper parallax: `enabled`, `strength`, `period`, `follow_camera`, see below |
+| `[parallax]` | wallpaper parallax: `enabled`, `strength`, `follow_camera`, `swing`, `period`, see below |
+| `[draw]` | pen `width` and `colors` |
+| `[presentation]` | `interval`: seconds per slide, 0 waits for the key |
 | `[minimap]` | minimap position, size, colors |
 | `[scratchpad]` | the drop-down window: command, app id, size |
 | `[[rule]]` | window rules, see below |
@@ -319,12 +369,15 @@ triggers: `left`, `right`, `middle`, `back`, `forward`, `scroll`.
 | `snap left\|right\|up\|down` | half screen, maximize, restore |
 | `workspace <1-10>`, `move-to-workspace <1-10>` | workspaces |
 | `window <1-10>` | the n-th window in the order it was opened |
-| `profile save\|load <name>` | [desktop profiles](#desktop-profiles) |
+| `profile save\|load\|delete <name>`, `profile rename <old> <new>` | [desktop profiles](#desktop-profiles) |
 | `find` | search windows, groups and bookmarks |
 | `camera back\|forward` | camera history |
 | `bookmark save\|go\|delete <name>` | camera bookmarks (per workspace) |
 | `group add [<name>]\|remove\|toggle [<name>]\|fit [<name>]\|move <dir>` | groups |
 | `scratchpad` | drop-down window |
+| `draw [on\|off\|undo\|clear\|hide\|color N\|color next]` | drawing on the canvas |
+| `arrange grid\|row\|column` | line up the focused group or the workspace |
+| `present [start\|stop\|next\|prev]` | presentation through the bookmarks |
 | `layout next\|<index>` | keyboard layout |
 | `reload-config`, `quit`, `vt <1-12>` | system |
 
@@ -359,20 +412,25 @@ Options: `workspace`, `position`, `size`, `pin`, `maximize`, `fullscreen`,
 
 ### Wallpaper parallax
 
+These are the defaults:
+
 ```toml
 [parallax]
 enabled = true
-strength = 0.04       # how far it travels, share of the screen width (0.01 .. 0.15)
-period = 60.0         # seconds for one full swing left, right and back
-follow_camera = true  # also shift against the canvas while panning
+strength = 0.15       # how far it travels, share of the screen width (0.01 .. 0.15)
+follow_camera = true  # shift against the canvas while panning
+swing = false         # also sway slowly left and right on its own
+period = 60.0         # seconds for one full swing (only with swing = true)
 ```
 
 The wallpaper (any `background` layer surface: awww, swaybg, hyprpaper…)
-is zoomed in by `strength`, so its edges never show, and sways slowly on
-two mixed sine waves, mostly left and right with a small vertical drift.
-With `follow_camera`, panning the canvas moves it a little the other way,
-like a far-away backdrop. It repaints about 30 times a second only while
-enabled; turning it off in the config stops that at once.
+is zoomed in by `strength`, so its edges never show. With `follow_camera`,
+panning the canvas moves it a little the other way, like a far-away
+backdrop; this costs nothing extra, because panning repaints anyway.
+`swing = true` adds a slow sway on two mixed sine waves, mostly left and
+right with a small vertical drift; only then does pzwm repaint about 30
+times a second. `swing = false` with `follow_camera = true` (the default)
+keeps only the movement that follows the canvas.
 
 ## Workspaces and the bar
 
@@ -444,15 +502,31 @@ their changes last until the next config reload.
 
 A profile is a saved arrangement of your apps.
 
+**The Desktop Profiles window** (`Super+Shift+P`, **Desktop Profiles** in
+the launcher, or the Profiles page of pzwm config):
+
+1. Type a name in *Save the desktop* and press Enter: the desktop as it
+   is now is saved under that name.
+2. Each saved profile shows its windows, apps, workspaces, drawings and
+   when it was saved. **Load** puts it back. The buttons next to it
+   replace it with the current desktop, rename it, or delete it (both ask
+   first).
+3. The page talks to the running pzwm directly; there is nothing to
+   Save in the header.
+
+From a terminal or a script:
+
 ```sh
-pzwm msg profile save work     # save the current arrangement as "work"
-pzwm msg profile load work     # put everything back
-pzwm msg profile list          # list saved profiles
+pzwm msg profile save work          # save the current arrangement as "work"
+pzwm msg profile load work          # put everything back
+pzwm msg profile list               # names; add --json for details
+pzwm msg profile rename work office
+pzwm msg profile delete office
 ```
 
-- **Saved**: for each window its app, workspace, position, size and
-  maximized state; the view of every workspace; which workspace each
-  monitor shows.
+- **Saved**: for each window its app, workspace, position, size,
+  maximized state and group; the view of every workspace; which workspace
+  each monitor shows; the drawings on the canvas.
 - **Loading** moves open windows back, starts the apps that are not running
   (with `gtk-launch`, so the app id must match a `.desktop` file) and places
   their windows as they appear, for up to a minute.
@@ -460,6 +534,10 @@ pzwm msg profile list          # list saved profiles
   letters, digits, `-` and `_`.
 - Bind them to keys (`"Super+F1" = "profile save work"`), or load one at
   login: `autostart = ["pzwm msg profile load work"]`.
+- **Autosave**: with `[general] autosave = true` (the default) pzwm saves
+  the profile `autosave` every 2 minutes and when it quits, but never an
+  empty desktop. After a crash, `pzwm msg profile load autosave` (or Load
+  in the window) brings your apps back.
 
 ## Groups, bookmarks and find
 
@@ -482,6 +560,53 @@ pzwm msg profile list          # list saved profiles
   default; for ghostty use `ghostty --class=pzwm-scratchpad`). Any window
   can become it with a `scratchpad = true` rule.
 
+## Drawing, presentation, arrange, semantic zoom
+
+**Drawing** turns the canvas into a whiteboard: notes and arrows that
+point from one window to another.
+
+1. `Super+Shift+D` turns the pen on; the cursor becomes a crosshair.
+2. Left drag draws; `Shift` + left drag draws a straight arrow; right drag
+   erases every stroke it touches. The pen draws over windows too; the bar
+   and the minimap still work.
+3. `1` … `9` pick a color from `[draw] colors`, `Ctrl+Z` undoes the last
+   stroke, `Delete` clears the workspace, `Esc` (or `Super+Shift+D`) turns
+   the pen off. While the pen is on, these keys do not reach apps.
+4. `Super+Alt+D` hides or shows all drawings.
+
+Strokes live on the canvas, so they pan and zoom with the windows. The
+pen width is in screen pixels at the zoom you draw at: zoomed out you
+draw thick lines for the big picture, zoomed in thin notes. Drawings are
+kept per workspace in `~/.local/state/pzwm/drawings.json` and saved in
+desktop profiles.
+
+```toml
+[draw]
+width = 4.0
+colors = ["#f38ba8", "#fab387", "#f9e2af", "#a6e3a1", "#89b4fa", "#cdd6f4"]
+```
+
+**Presentation**: save a few bookmarks on a workspace
+(`Super+Alt+Shift+1…5`, or `pzwm msg bookmark save intro`), then press
+`Super+F5`. The camera flies to each bookmark in turn: numbered ones
+first (1, 2, … 10), then the others by name. `Super+Page Down` /
+`Super+Page Up` step, `Super+F5` ends the show and flies back to where it
+started. With `[presentation] interval = 8` it moves on every 8 seconds
+and ends after the last slide.
+
+**Arrange**: `Super+Shift+A` lays out the focused window's group as a
+grid (about √n per row), `Super+Alt+A` as one row (`arrange column` is a
+column). Outside a group it arranges every canvas window of the
+workspace. Windows keep their size and their reading order (top to
+bottom, left to right), start at the top-left of where they were, and the
+camera fits the result. It happens once; drag windows freely afterwards.
+
+**Semantic zoom**: when you zoom out below `[canvas] semantic_zoom`
+(0.3, that is 30 %), the unreadable miniature of each window fades into a
+card in its app's color with the app icon in the middle. Icons come from
+the app's `.desktop` file and the hicolor theme (PNG only; apps with only
+an SVG icon get the card without one). `semantic_zoom = 0` turns it off.
+
 ## Screen sharing and screenshots
 
 - **Screen sharing** (browsers, Discord, OBS): install
@@ -503,7 +628,8 @@ the reply. Any [action](#configuration-file) works as a request.
 | `pzwm msg outputs` | one line per monitor: name, size, position, scale, workspace, camera |
 | `pzwm msg windows --json`, `outputs --json` | the same as JSON (windows also with title, group, hidden) |
 | `pzwm msg subscribe` | stays connected and prints one JSON event per line (see below) |
-| `pzwm msg profile save\|load\|list …` | see [Desktop profiles](#desktop-profiles) |
+| `pzwm msg profile save\|load\|delete\|rename\|list …` | see [Desktop profiles](#desktop-profiles); `profile list --json` gives windows, apps, workspaces and save time |
+| `pzwm msg draw …`, `present …`, `arrange …` | see [Drawing, presentation, arrange](#drawing-presentation-arrange-semantic-zoom); errors are printed, not only notified |
 | `pzwm msg bookmark list`, `group list` | bookmarks and groups with their workspace |
 | `pzwm msg heads --json` | every connected monitor (also disabled ones) with the modes it offers |
 | `pzwm reload` | re-read the config |
@@ -581,6 +707,8 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | Wallpaper on a mirrored TV leaves bars on the right and bottom | Fixed in pzwm: a mirror now draws surfaces at its own scale. Rebuild and log in again |
 | A monitor change from kanshi/wdisplays is gone | Runtime changes last until the config is reloaded; put them in `[[output]]` to keep them |
 | Displays Settings (nwg-displays) quits at once | It supports only sway, Hyprland, niri and Mango; use **Display Settings** (pzwm config) or wdisplays |
+| A window card shows no icon when zoomed out | The app only ships an SVG icon (or none); semantic zoom reads PNG icons. Set `[canvas] semantic_zoom = 0` to turn the cards off |
+| The mouse draws lines instead of clicking | The pen is on: press `Esc` or `Super+Shift+D` |
 | `Super+/` does nothing | Install rofi, fuzzel or wofi, or set `[general] picker` |
 | The scratchpad does not open | Its command needs foot by default; set `[scratchpad] command` |
 | Night light does nothing | wlsunset/gammastep need a real session (not `--nested`) |
@@ -604,6 +732,10 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | `src/toplevels.rs` | window lists for taskbars (foreign-toplevel) |
 | `src/output_management.rs`, `src/gamma.rs` | monitor tools and night light |
 | `src/rules.rs`, `src/scratchpad.rs` | window rules, drop-down window |
+| `src/draw.rs`, `src/render/drawings.rs` | drawing on the canvas: strokes, eraser, saving, rendering |
+| `src/present.rs`, `src/arrange.rs` | presentation through bookmarks, one-shot layouts |
+| `src/icons.rs`, `src/render/semantic.rs` | app icon lookup, semantic-zoom cards |
+| `src/render/parallax.rs` | wallpaper parallax |
 | `src/groups.rs`, `src/jumps.rs`, `src/find.rs` | groups, camera history and bookmarks, find |
 | `src/events.rs` | `pzwm msg subscribe` event stream |
 | `src/render/` | drawing: element list per monitor, GLSL shaders |
@@ -615,7 +747,7 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | `src/ipc.rs` | `pzwm msg` socket |
 | `src/screencopy.rs` | wlr-screencopy for screenshots and screen sharing |
 | `resources/default-config.toml` | documented default config (built into the binary) |
-| `resources/pzwm-config/` | the settings app (Python, GTK 4, libadwaita) |
+| `resources/pzwm-config/` | the settings app (Python, GTK 4, libadwaita); `profiles_page.py` is the Desktop Profiles page |
 | `resources/` (other files) | session script, login-screen entry, systemd target, portal config |
 | `install.sh`, `scripts/install-deps.sh` | install and dependency scripts |
 
@@ -648,6 +780,7 @@ pzwm is built on these open-source projects. Thank you to their authors.
 | [winit](https://github.com/rust-windowing/winit) | `--nested` mode | Apache-2.0 |
 | [serde](https://github.com/serde-rs/serde), [toml](https://github.com/toml-rs/toml) | reading the config | MIT or Apache-2.0 |
 | [serde_json](https://github.com/serde-rs/json) | profiles, bar feed | MIT or Apache-2.0 |
+| [png](https://github.com/image-rs/image-png) | app icons for semantic zoom | MIT or Apache-2.0 |
 | [tracing](https://github.com/tokio-rs/tracing) | logs | MIT |
 | [anyhow](https://github.com/dtolnay/anyhow) | errors | MIT or Apache-2.0 |
 | [xcursor](https://github.com/esposm03/xcursor-rs) | cursor themes | MIT |

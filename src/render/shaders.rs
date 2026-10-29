@@ -195,6 +195,33 @@ void main() {
 }
 "#;
 
+/// A round-capped line from `u_seg.xy` to `u_seg.zw` (element pixels):
+/// one piece of a drawing on the canvas.
+const SEGMENT_FRAG: &str = r#"
+varying vec2 v_coords;
+uniform vec2 size;
+uniform float alpha;
+#if defined(DEBUG_FLAGS)
+uniform float tint;
+#endif
+uniform vec4 u_seg;
+uniform float u_half;
+uniform vec4 u_color;
+void main() {
+    vec2 p = v_coords * size;
+    vec2 pa = p - u_seg.xy;
+    vec2 ba = u_seg.zw - u_seg.xy;
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 0.0001), 0.0, 1.0);
+    float d = length(pa - ba * h) - u_half;
+    float cover = 1.0 - smoothstep(-0.5, 0.5, d);
+    vec4 col = vec4(u_color.rgb * u_color.a, u_color.a) * cover;
+#if defined(DEBUG_FLAGS)
+    if (tint == 1.0) col = vec4(0.0, 0.2, 0.0, 0.2) + col * 0.8;
+#endif
+    gl_FragColor = col * alpha;
+}
+"#;
+
 /// Texture shader that cuts rounded corners out of client surfaces.
 const CLIP_FRAG: &str = r#"
 //_DEFINES_
@@ -246,6 +273,7 @@ pub struct Shaders {
     pub grid: GlesPixelProgram,
     pub frame: GlesPixelProgram,
     pub rect: GlesPixelProgram,
+    pub segment: GlesPixelProgram,
     pub clip: GlesTexProgram,
 }
 
@@ -308,6 +336,10 @@ impl Shaders {
                 u("u_border", _1f),
             ],
         )?;
+        let segment = renderer.compile_custom_pixel_shader(
+            format!("{PRECISION}{SEGMENT_FRAG}"),
+            &[u("u_seg", _4f), u("u_half", _1f), u("u_color", _4f)],
+        )?;
         let clip = renderer.compile_custom_texture_shader(
             CLIP_FRAG,
             &[u("u_uv_to_px", _4f), u("u_clip", _4f), u("u_radii", _2f)],
@@ -316,6 +348,7 @@ impl Shaders {
             grid,
             frame,
             rect,
+            segment,
             clip,
         })
     }

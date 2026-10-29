@@ -223,6 +223,12 @@ pub struct State {
     pub collapsed_groups: std::collections::HashSet<String>,
     /// When `scratchpad` last started its app, so a double press starts one.
     pub scratchpad_spawned: Option<Instant>,
+    /// The running `present` show, see present.rs.
+    pub presentation: Option<crate::present::Show>,
+    /// Drawings on the canvas and the pen, see draw.rs.
+    pub draw: crate::draw::Drawing,
+    /// App icons for semantic zoom.
+    pub icons: crate::icons::Icons,
     pub xwayland_display: Option<String>,
     pub children: Vec<std::process::Child>,
 }
@@ -397,6 +403,9 @@ impl State {
             jumps: crate::jumps::Jumps::load(),
             collapsed_groups: Default::default(),
             scratchpad_spawned: None,
+            presentation: None,
+            draw: crate::draw::Drawing::load(),
+            icons: Default::default(),
             xwayland_display: None,
             children: Vec::new(),
         })

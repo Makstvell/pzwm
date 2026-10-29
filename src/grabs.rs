@@ -53,6 +53,13 @@ pub enum Interaction {
         output: Output,
         last: Point<f64, Logical>,
     },
+    /// Drawing stroke `id` (or erasing) with the pen, see draw.rs.
+    Draw {
+        output: Output,
+        ws: usize,
+        id: u64,
+        erase: bool,
+    },
     Resize {
         id: u64,
         edges: ResizeEdge,
@@ -104,6 +111,34 @@ pub fn start_pan(state: &mut State, serial: Serial, button: u32) {
         state,
         Interaction::Pan { output, last },
         CursorIcon::Grabbing,
+        serial,
+        button,
+    );
+}
+
+pub fn start_draw(
+    state: &mut State,
+    output: Output,
+    ws: usize,
+    id: u64,
+    erase: bool,
+    serial: Serial,
+    button: u32,
+) {
+    let icon = if erase {
+        CursorIcon::NotAllowed
+    } else {
+        CursorIcon::Crosshair
+    };
+    begin(
+        state,
+        Interaction::Draw {
+            output,
+            ws,
+            id,
+            erase,
+        },
+        icon,
         serial,
         button,
     );
@@ -314,6 +349,24 @@ impl State {
                     last: self.cursor,
                 }
             }
+            Interaction::Draw {
+                output,
+                ws,
+                id,
+                erase,
+            } => {
+                if erase {
+                    self.erase_at_cursor(ws);
+                } else {
+                    self.draw_motion(&output, ws, id);
+                }
+                Interaction::Draw {
+                    output,
+                    ws,
+                    id,
+                    erase,
+                }
+            }
             Interaction::Resize {
                 id,
                 edges,
@@ -500,6 +553,18 @@ impl State {
                 }
             }
             Some(Interaction::MapDrag { .. }) => self.map_drag_ended(),
+            Some(Interaction::Draw {
+                output,
+                ws,
+                id,
+                erase,
+            }) => {
+                if erase {
+                    self.erase_finished();
+                } else {
+                    self.draw_finished(&output, ws, id);
+                }
+            }
             Some(Interaction::Pan { .. } | Interaction::MoveGroup { .. }) | None => {}
         }
         // We are inside the pointer's grab callback: touching the pointer

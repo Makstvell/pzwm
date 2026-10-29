@@ -16,7 +16,8 @@ was not verified, so look at each repository before relying on it.
 
 What pzwm has that these mostly do not: per-workspace cameras, a minimap
 with live previews, desktop profiles (`profile save|load`), monitor
-mirroring and a DankMaterialShell workspace feed.
+mirroring, a DankMaterialShell workspace feed, drawing on the canvas,
+semantic zoom, presentations through bookmarks and one-shot arrange.
 
 Ideas worth borrowing: driftwm's pan momentum for touchpads, and niri's IPC
 (a JSON event stream many bars already support).
