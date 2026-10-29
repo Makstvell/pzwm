@@ -17,6 +17,7 @@ mod grabs;
 mod groups;
 mod handlers;
 mod icons;
+mod image_copy;
 mod input;
 mod ipc;
 mod jumps;

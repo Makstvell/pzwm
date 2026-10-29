@@ -63,7 +63,8 @@
 - **Профілі**: зберегти, де лежать програми, і повернути пізніше; вікно
   **Desktop Profiles** (`Super+Shift+P`) для керування ними; профіль
   `autosave` зберігається сам і рятує після краша.
-- Кілька моніторів, дзеркало на телевізор, демонстрація екрана, X11 через
+- Кілька моніторів, дзеркало на телевізор, демонстрація екрана
+  (ext-image-copy-capture і wlr-screencopy), X11 через
   xwayland-satellite, таскбари, kanshi / wdisplays / wlr-randr, нічний
   режим, fcitx5, графічні планшети.
 
@@ -312,7 +313,7 @@ hicolor (лише PNG; програми тільки з SVG-іконкою от�
 | Проблема | Що робити |
 |---|---|
 | DMS-бар не з'являється | `systemctl --user add-wants pzwm-session.target dms.service` |
-| Демонстрація екрана (Discord, браузер) показує одну нерухому картинку або нічого | Виправлено: захоплення екрана тепер пропонує XRGB8888 (формат BGRx, який просять клієнти PipeWire), а не лише ARGB8888, і повідомляє про зміни кадру. Раніше портал не міг створити буфер (`xdpw: unable to find format`) і кадри не йшли. Перезібрати й перелогінитись |
+| Демонстрація екрана (Discord, браузер) показує одну нерухому картинку або нічого | Виправлено: pzwm тепер підтримує ext-image-copy-capture, тож xdg-desktop-portal-wlr не йде старим шляхом wlr-screencopy, який у версії 0.8.4 зупиняється після першого кадру (issue #411); кадри ще й у форматі XRGB8888, який просять клієнти PipeWire. Перезібрати й перелогінитись. Перевірка: `journalctl --user -u xdg-desktop-portal-wlr` має показати `using ext_image_copy_capture` |
 | У DMS-барі немає іконок трею | Додай віджет **System Tray** (налаштування DMS → Widgets) або `{"id": "systemTray", "enabled": true}` у `rightWidgets` файла `~/.config/DankMaterialShell/settings.json`. Програми, що згортаються в трей (Discord, Telegram), будуть там |
 
 ## Ліцензія

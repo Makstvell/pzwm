@@ -94,7 +94,8 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 - Several monitors with their own mode, scale and position, or mirroring
   one monitor onto another (a mirror is scaled to fill a TV of another
   resolution, wallpaper included).
-- Screen sharing and screenshots (wlr-screencopy, xdg-desktop-portal-wlr).
+- Screen sharing and screenshots (ext-image-copy-capture and wlr-screencopy,
+  xdg-desktop-portal-wlr).
 - X11 apps through xwayland-satellite.
 - Taskbars and docks see and control the windows (foreign-toplevel).
 - Monitor tools work live: kanshi, wdisplays, wlr-randr
@@ -642,9 +643,11 @@ an SVG icon get the card without one). `semantic_zoom = 0` turns it off.
 
 - **Screen sharing** (browsers, Discord, OBS): install
   `xdg-desktop-portal-wlr`. The installed `pzwm-portals.conf` sends screen
-  sharing and screenshot requests to it. Captures are offered as XRGB8888 and
-  ARGB8888, and every frame is reported as changed (`copy_with_damage`),
-  so the stream stays live.
+  sharing and screenshot requests to it. pzwm offers
+  **ext-image-copy-capture**, which the portal prefers: its older
+  wlr-screencopy path in xdg-desktop-portal-wlr 0.8.4 stops after the
+  first frame (upstream issue #411). Captures are XRGB8888 or ARGB8888
+  shm buffers, and every frame is reported as changed.
 - **Screenshots**: `Print` saves the screen to `~/Pictures/Screenshots`,
   `Super+Shift+S` copies a selected area. Both use `grim` and `slurp`,
   which work through wlr-screencopy.
@@ -717,7 +720,8 @@ bound to `pzwm-session.target`.
 
 Supported Wayland protocols include xdg-shell, xdg-decoration,
 wlr-layer-shell, ext-session-lock, ext-idle-notify, idle-inhibit,
-wlr-screencopy, wlr-data-control, primary selection, xdg-activation,
+wlr-screencopy, ext-image-copy-capture, ext-image-capture-source,
+wlr-data-control, primary selection, xdg-activation,
 fractional-scale, viewporter, linux-dmabuf, presentation-time,
 pointer-constraints, relative-pointer, pointer-gestures, cursor-shape,
 keyboard-shortcuts-inhibit, single-pixel-buffer, wlr-foreign-toplevel-management,
@@ -735,7 +739,7 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | Bar shows no workspaces | Check that `umbriel` is installed (`which umbriel`) and that DMS was started by pzwm |
 | A keyboard layout is missing | XKB allows at most 4 layouts; the 5th in `layouts` is ignored |
 | Screen sharing shows nothing | Install `xdg-desktop-portal-wlr`, then log in again |
-| Screen sharing (Discord, browser) shows one still picture or nothing | Fixed in pzwm: screen capture now offers XRGB8888 (the BGRx format PipeWire clients ask for) besides ARGB8888, and reports damage. Before, the portal could not create a buffer (`xdpw: unable to find format`) and the stream got no frames. Rebuild and log in again |
+| Screen sharing (Discord, browser) shows one still picture or nothing | Fixed in pzwm: it now offers ext-image-copy-capture, so xdg-desktop-portal-wlr no longer uses its wlr-screencopy path, which in 0.8.4 stalls after the first frame; captures also come in XRGB8888, the format PipeWire clients ask for. Rebuild and log in again. Check with `journalctl --user -u xdg-desktop-portal-wlr`: it should say `using ext_image_copy_capture` |
 | Tray icons are missing in the DMS bar | Add the **System Tray** widget to the bar (DMS settings → Widgets), or `{"id": "systemTray", "enabled": true}` to `rightWidgets` in `~/.config/DankMaterialShell/settings.json`. Apps that close to the tray (Discord, Telegram) show there |
 | X11 apps do not start | Install `xwayland-satellite` |
 | Chrome/Chromium leaves fullscreen video after ~1.5 s | Fixed in pzwm: frames now report presentation feedback (Chromium 151+ quits fullscreen when every frame reads as discarded). Rebuild and log in again |
@@ -781,7 +785,7 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | `src/profiles.rs` | desktop profiles |
 | `src/bar.rs` | workspace feed for DankMaterialShell |
 | `src/ipc.rs` | `pzwm msg` socket |
-| `src/screencopy.rs` | wlr-screencopy for screenshots and screen sharing |
+| `src/screencopy.rs`, `src/image_copy.rs` | wlr-screencopy and ext-image-copy-capture for screenshots and screen sharing |
 | `resources/default-config.toml` | documented default config (built into the binary) |
 | `resources/pzwm-config/` | the settings app (Python, GTK 4, libadwaita); `profiles_page.py` is the Desktop Profiles page |
 | `resources/` (other files) | session script, login-screen entry, systemd target, portal config |

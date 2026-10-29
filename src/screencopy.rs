@@ -1,5 +1,6 @@
 //! wlr-screencopy (shm buffers): lets `grim`, `slurp`-based screenshots and
-//! screen recorders capture pzwm outputs.
+//! screen recorders capture pzwm outputs. Copies asked through
+//! ext-image-copy-capture (image_copy.rs) are served here too.
 
 use smithay::{
     backend::{
@@ -40,14 +41,59 @@ pub struct FrameData {
     used: AtomicBool,
 }
 
+/// The frame object a copy answers to.
+pub enum CopyFrame {
+    Wlr {
+        frame: ZwlrScreencopyFrameV1,
+        /// Asked with `copy_with_damage`: the client needs `damage` before `ready`.
+        with_damage: bool,
+    },
+    Ext(crate::image_copy::ExtFrame),
+}
+
+/// Why a copy could not be served (ext-image-copy-capture tells the client).
+#[derive(Clone, Copy)]
+pub enum Failure {
+    /// The client buffer has the wrong size or format.
+    Constraints,
+    /// The output went away.
+    Stopped,
+    Unknown,
+}
+
 pub struct PendingCopy {
-    frame: ZwlrScreencopyFrameV1,
-    buffer: WlBuffer,
-    output: Output,
-    region: Rectangle<i32, Physical>,
-    cursor: bool,
-    /// Asked with `copy_with_damage`: the client needs `damage` before `ready`.
-    with_damage: bool,
+    pub frame: CopyFrame,
+    pub buffer: WlBuffer,
+    pub output: Output,
+    pub region: Rectangle<i32, Physical>,
+    pub cursor: bool,
+}
+
+impl CopyFrame {
+    fn ready(&self, size: Size<i32, Physical>, time: std::time::Duration) {
+        let secs = time.as_secs();
+        let (hi, lo, nsec) = ((secs >> 32) as u32, secs as u32, time.subsec_nanos());
+        match self {
+            Self::Wlr { frame, with_damage } => {
+                frame.flags(Flags::empty());
+                // Every copy is a fresh render, so all of it counts as changed.
+                // Without this, screen sharing through the portal (Discord,
+                // browsers) reads "nothing changed" and keeps the first frame.
+                if *with_damage && frame.version() >= 2 {
+                    frame.damage(0, 0, size.w as u32, size.h as u32);
+                }
+                frame.ready(hi, lo, nsec);
+            }
+            Self::Ext(frame) => frame.ready(size, hi, lo, nsec),
+        }
+    }
+
+    pub fn failed(&self, why: Failure) {
+        match self {
+            Self::Wlr { frame, .. } => frame.failed(),
+            Self::Ext(frame) => frame.failed(why),
+        }
+    }
 }
 
 pub fn init(dh: &DisplayHandle) {
@@ -181,12 +227,14 @@ impl Dispatch<ZwlrScreencopyFrameV1, Option<FrameData>> for State {
             return;
         }
         state.pending_copies.push(PendingCopy {
-            frame: frame.clone(),
+            frame: CopyFrame::Wlr {
+                frame: frame.clone(),
+                with_damage,
+            },
             buffer,
             output: data.output.clone(),
             region: data.region,
             cursor: data.cursor,
-            with_damage,
         });
         let output = data.output.clone();
         state.queue_redraw(&output);
@@ -198,7 +246,7 @@ impl Dispatch<ZwlrScreencopyFrameV1, Option<FrameData>> for State {
 pub fn fail_output(state: &mut State, output: &Output) {
     state.pending_copies.retain(|p| {
         if &p.output == output {
-            p.frame.failed();
+            p.frame.failed(Failure::Stopped);
             false
         } else {
             true
@@ -213,25 +261,15 @@ pub fn process(state: &mut State, renderer: &mut GlesRenderer, output: &Output) 
         .partition(|p| &p.output == output);
     state.pending_copies = rest;
     for copy in mine {
-        let result = copy_one(state, renderer, &copy);
-        match result {
-            Ok(()) => {
-                copy.frame.flags(Flags::empty());
-                // Every copy is a fresh render, so all of it counts as changed.
-                // Without this, screen sharing through the portal (Discord,
-                // browsers) reads "nothing changed" and keeps the first frame.
-                if copy.with_damage && copy.frame.version() >= 2 {
-                    let size = copy.region.size;
-                    copy.frame.damage(0, 0, size.w as u32, size.h as u32);
-                }
-                let t: std::time::Duration = state.clock.now().into();
-                let secs = t.as_secs();
-                copy.frame
-                    .ready((secs >> 32) as u32, secs as u32, t.subsec_nanos());
+        match copy_one(state, renderer, &copy) {
+            Ok(true) => copy.frame.ready(copy.region.size, state.clock.now().into()),
+            Ok(false) => {
+                warn!("screencopy failed: client buffer has the wrong size or format");
+                copy.frame.failed(Failure::Constraints);
             }
             Err(err) => {
                 warn!("screencopy failed: {err}");
-                copy.frame.failed();
+                copy.frame.failed(Failure::Unknown);
             }
         }
     }
@@ -241,7 +279,8 @@ fn copy_one(
     state: &mut State,
     renderer: &mut GlesRenderer,
     copy: &PendingCopy,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
+    // Ok(false): the client buffer does not match the size or format offered.
     let output = &copy.output;
     let mode = output.current_mode().map(|m| m.size).unwrap_or_default();
     let scale = output.current_scale().fractional_scale();
@@ -300,11 +339,5 @@ fn copy_one(
         true
     })
     .map_err(|e| anyhow::anyhow!("buffer: {e:?}"))?;
-    if written {
-        Ok(())
-    } else {
-        Err(anyhow::anyhow!(
-            "client buffer has the wrong size or format"
-        ))
-    }
+    Ok(written)
 }

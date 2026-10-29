@@ -306,6 +306,7 @@ impl State {
         let cursor_shape_state = CursorShapeManagerState::new::<Self>(&dh);
         let single_pixel_buffer_state = SinglePixelBufferState::new::<Self>(&dh);
         crate::screencopy::init(&dh);
+        crate::image_copy::init(&dh);
         let toplevels = crate::toplevels::Toplevels::new(&dh);
         let protocols = crate::protocols::Protocols::new(&dh);
         crate::gamma::init(&dh);
