@@ -75,7 +75,7 @@ further windows always open by the window they belong to. Details:
 | Window numbers by place (top left first, or top right, columns, opening order), more than 10 | `Super+1` … `0`, hold `Super` for 11, 12, …; `[general] window_numbers` | [Window numbers](#window-numbers) |
 | Screen sharing in Discord and browsers keeps streaming (ext-image-copy-capture) | | [Screen sharing](#screen-sharing-and-screenshots) |
 | Window rules match apps that set their title late (Chrome, Electron) | `[[rule]]` | [Configuration file](#configuration-file) |
-| Find zooms in on the window it flies to; `Super+G` again expands the group it just collapsed; the Desktop Profiles name field has focus | | [Groups, bookmarks and find](#groups-bookmarks-and-find) |
+| Find shows readable names (`Infra Monitor · Web app · workspace 3`, the app's name from its `.desktop` file) and zooms in on the window it flies to; `Super+G` again expands the group it just collapsed; the Desktop Profiles name field has focus | | [Groups, bookmarks and find](#groups-bookmarks-and-find) |
 
 ## Features
 
@@ -731,7 +731,9 @@ pzwm msg profile delete office
 - **Find** lists every window (also on other workspaces, minimized or in
   a collapsed group), every group and every bookmark. pzwm draws no text
   itself, so the list is shown by a dmenu-style program: `[general]
-  picker`, else rofi, fuzzel or wofi. Jumping to a window that would stay
+  picker`, else rofi, fuzzel or wofi. Each line reads `Title · App ·
+  workspace N`, the app named as in its `.desktop` file (browser app
+  windows show as "Web app"). Jumping to a window that would stay
   a thumbnail (from the overview, say) zooms in on it.
 - **Collapse and expand**: `Super+G` collapses the focused window's group
   and hands focus to another window; pressed again right away it expands

@@ -96,14 +96,19 @@ impl State {
         let mut lines = Vec::new();
         for m in self.windows.iter().filter(|m| m.mapped) {
             let title = clean(&self.title(m).unwrap_or_default());
-            let app = clean(&self.app_id(m).unwrap_or_default());
+            let app = clean(&crate::icons::app_name(&self.app_id(m).unwrap_or_default()));
             let place = match m.placement {
                 _ if m.scratchpad => "scratchpad".to_string(),
                 Placement::Pinned => "pinned".to_string(),
                 _ => format!("workspace {}", m.ws + 1),
             };
-            let name = if title.is_empty() { app.clone() } else { title };
-            lines.push(format!("{name}  ({app}, {place})  #w{}", m.id));
+            // "Title · App · workspace 2", the app left out when the title says it.
+            let line = if title.is_empty() || title.eq_ignore_ascii_case(&app) {
+                format!("{app}  ·  {place}")
+            } else {
+                format!("{title}  ·  {app}  ·  {place}")
+            };
+            lines.push(format!("{line}  #w{}", m.id));
         }
         for (ws, name) in self.group_names() {
             let n = self.group_members(&name, ws).len();

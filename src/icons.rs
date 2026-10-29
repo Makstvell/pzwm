@@ -102,6 +102,45 @@ fn icon_name(app_id: &str, dirs: &[PathBuf]) -> String {
     app_id.to_string()
 }
 
+/// The `Name=` (not a translated one) of the `[Desktop Entry]` group.
+fn desktop_name(text: &str) -> Option<String> {
+    let mut in_entry = false;
+    for line in text.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_entry = line == "[Desktop Entry]";
+        } else if let Some(v) = line.strip_prefix("Name=").filter(|_| in_entry) {
+            return Some(v.trim().to_string()).filter(|v| !v.is_empty());
+        }
+    }
+    None
+}
+
+/// A readable name for an app id, for lists such as find: the `.desktop`
+/// file's `Name=`, "Web app" for browser app windows (their ids are long
+/// generated strings), else the id itself.
+pub fn app_name(app_id: &str) -> String {
+    const WEB_APPS: [&str; 4] = ["chrome-", "chromium-", "msedge-", "brave-"];
+    if WEB_APPS.iter().any(|p| app_id.starts_with(p)) && app_id.contains('_') {
+        return "Web app".into();
+    }
+    let lower = app_id.to_lowercase();
+    data_dirs()
+        .iter()
+        .map(|d| d.join("applications"))
+        .flat_map(|dir| {
+            [
+                dir.join(format!("{app_id}.desktop")),
+                dir.join(format!("{lower}.desktop")),
+            ]
+        })
+        .find_map(|path| {
+            std::fs::read_to_string(path)
+                .ok()
+                .and_then(|t| desktop_name(&t))
+        })
+        .unwrap_or_else(|| app_id.to_string())
+}
+
 fn icon_file(name: &str, dirs: &[PathBuf]) -> Option<PathBuf> {
     let path = Path::new(name);
     if path.is_absolute() {
@@ -190,6 +229,11 @@ mod tests {
 
     #[test]
     fn reads_icon_and_class_from_the_main_group_only() {
+        assert_eq!(
+            desktop_name("[Desktop Entry]\nName[uk]=Фу\nName=Foo\n[Desktop Action a]\nName=Bar\n"),
+            Some("Foo".into())
+        );
+        assert_eq!(app_name("chrome-__tmp_demo_stats.html-Default"), "Web app");
         let text = "[Desktop Entry]\nName=Foo\nIcon=foo-icon\nStartupWMClass=Foo\n\
                     [Desktop Action new]\nIcon=other\n";
         assert_eq!(
