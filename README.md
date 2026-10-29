@@ -642,8 +642,9 @@ an SVG icon get the card without one). `semantic_zoom = 0` turns it off.
 
 - **Screen sharing** (browsers, Discord, OBS): install
   `xdg-desktop-portal-wlr`. The installed `pzwm-portals.conf` sends screen
-  sharing and screenshot requests to it. pzwm reports every captured frame
-  as changed (`copy_with_damage`), so the stream stays live.
+  sharing and screenshot requests to it. Captures are offered as XRGB8888 and
+  ARGB8888, and every frame is reported as changed (`copy_with_damage`),
+  so the stream stays live.
 - **Screenshots**: `Print` saves the screen to `~/Pictures/Screenshots`,
   `Super+Shift+S` copies a selected area. Both use `grim` and `slurp`,
   which work through wlr-screencopy.
@@ -734,7 +735,7 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | Bar shows no workspaces | Check that `umbriel` is installed (`which umbriel`) and that DMS was started by pzwm |
 | A keyboard layout is missing | XKB allows at most 4 layouts; the 5th in `layouts` is ignored |
 | Screen sharing shows nothing | Install `xdg-desktop-portal-wlr`, then log in again |
-| Screen sharing (Discord, browser) shows one still picture | Fixed in pzwm: frames copied with damage now report it, earlier builds sent none and the stream never updated. Rebuild and log in again |
+| Screen sharing (Discord, browser) shows one still picture or nothing | Fixed in pzwm: screen capture now offers XRGB8888 (the BGRx format PipeWire clients ask for) besides ARGB8888, and reports damage. Before, the portal could not create a buffer (`xdpw: unable to find format`) and the stream got no frames. Rebuild and log in again |
 | Tray icons are missing in the DMS bar | Add the **System Tray** widget to the bar (DMS settings → Widgets), or `{"id": "systemTray", "enabled": true}` to `rightWidgets` in `~/.config/DankMaterialShell/settings.json`. Apps that close to the tray (Discord, Telegram) show there |
 | X11 apps do not start | Install `xwayland-satellite` |
 | Chrome/Chromium leaves fullscreen video after ~1.5 s | Fixed in pzwm: frames now report presentation feedback (Chromium 151+ quits fullscreen when every frame reads as discarded). Rebuild and log in again |

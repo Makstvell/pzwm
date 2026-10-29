@@ -134,12 +134,23 @@ impl Dispatch<ZwlrScreencopyManagerV1, ()> for State {
             frame.failed();
             return;
         }
-        frame.buffer(
-            wl_shm::Format::Argb8888,
-            region.size.w as u32,
-            region.size.h as u32,
-            region.size.w as u32 * 4,
-        );
+        // Opaque XRGB8888 first: PipeWire consumers (Discord, browsers)
+        // negotiate BGRx, and the portal finds no buffer for it when only
+        // ARGB8888 is offered, so the stream never gets a frame. Both have
+        // the same byte layout. Before v3 a client sees only the first.
+        let formats: &[wl_shm::Format] = if frame.version() >= 3 {
+            &[wl_shm::Format::Xrgb8888, wl_shm::Format::Argb8888]
+        } else {
+            &[wl_shm::Format::Xrgb8888]
+        };
+        for &format in formats {
+            frame.buffer(
+                format,
+                region.size.w as u32,
+                region.size.h as u32,
+                region.size.w as u32 * 4,
+            );
+        }
         if frame.version() >= 3 {
             frame.buffer_done();
         }
