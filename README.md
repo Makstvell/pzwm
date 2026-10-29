@@ -19,6 +19,20 @@ line some up on a grid over the screen when you want to (`Super+T`).
 | **Status** | Personal project, version 0.1, used daily |
 | **License** | GPL-2.0-or-later |
 
+### Two ways to open windows
+
+| Mode | What happens when a window opens | Set it |
+|---|---|---|
+| **center** (default) | it appears at once in the middle of the view, 90 % × 90 % of the screen | `new_window_placement = "center"` |
+| **pick** | it waits until you drag out its area with the mouse, then takes exactly that place and size (Escape: the middle) | `new_window_placement = "pick"` |
+
+Switch in **pzwm config** → Canvas → *Where new windows open*, or in
+`~/.config/pzwm/config.toml` under `[canvas]`; it applies as soon as the
+file is saved. In either mode, `Super+O` (or `Super+Ctrl` + left drag)
+picks the place of just the next window, and dialogs and an app's own
+further windows always open by the window they belong to. Details:
+[Where new windows open](#where-new-windows-open).
+
 ## Contents
 
 1. [What's new](#whats-new)
