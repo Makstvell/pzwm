@@ -206,6 +206,10 @@ pub fn scaled_output_elements<R: PzRenderer>(
 
     if let Some(sh) = shaders.as_ref() {
         drawings::drawing_elements(state, output, os, sh, &mut out);
+        // The area picked for the next window, above the windows it covers.
+        if let Some(rect) = state.area_screen_rect(output) {
+            out.push(PzElement::Shader(preview_element(state, rect, os, sh)));
+        }
     }
 
     // The edge-tiling preview sits right under the window being dragged.

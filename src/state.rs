@@ -221,6 +221,11 @@ pub struct State {
     pub jumps: crate::jumps::Jumps,
     /// Groups whose windows are put away, only their frame showing.
     pub collapsed_groups: std::collections::HashSet<String>,
+    /// The group the last `group toggle` collapsed and the window that got
+    /// focus instead, so pressing it again expands that group.
+    pub last_collapsed: Option<(String, Option<u64>)>,
+    /// Area picked for the next window and the selection mode, see area.rs.
+    pub area: crate::area::AreaState,
     /// When `scratchpad` last started its app, so a double press starts one.
     pub scratchpad_spawned: Option<Instant>,
     /// The running `present` show, see present.rs.
@@ -402,6 +407,8 @@ impl State {
             profile_pending: Default::default(),
             jumps: crate::jumps::Jumps::load(),
             collapsed_groups: Default::default(),
+            last_collapsed: None,
+            area: Default::default(),
             scratchpad_spawned: None,
             presentation: None,
             draw: crate::draw::Drawing::load(),

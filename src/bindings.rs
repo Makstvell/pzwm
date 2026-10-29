@@ -78,6 +78,10 @@ impl State {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::ToggleMinimap));
                 }
+                if state.area.selecting && sym == Keysym::Escape {
+                    state.suppressed_keys.push(keycode);
+                    return FilterResult::Intercept(Some(Action::Area("cancel".into())));
+                }
                 if state.draw.active && !pressed.logo {
                     if let Some(action) = pen_key(pressed, sym) {
                         state.suppressed_keys.push(keycode);
@@ -159,6 +163,10 @@ impl State {
                 let args: Vec<&str> = args.split_whitespace().collect();
                 let result = self.draw_command(&args);
                 self.notify_result("draw", result, false);
+            }
+            Action::Area(args) => {
+                let result = self.area_command(&args);
+                self.notify_result("area", result, false);
             }
             Action::Arrange(how) => {
                 let result = self.arrange(how);

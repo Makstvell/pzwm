@@ -24,23 +24,24 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 2. [Install](#install)
 3. [First steps](#first-steps)
 4. [How it works](#how-it-works)
-5. [Shortcuts](#shortcuts)
-6. [Helper apps](#helper-apps)
-7. [Settings app: pzwm config](#settings-app-pzwm-config)
-8. [Configuration file](#configuration-file)
-9. [Workspaces and the bar](#workspaces-and-the-bar)
-10. [Monitors](#monitors)
-11. [Desktop profiles](#desktop-profiles)
-12. [Groups, bookmarks and find](#groups-bookmarks-and-find)
-13. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
-14. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
-15. [Scripting: pzwm msg](#scripting-pzwm-msg)
-16. [Works with](#works-with)
-17. [Troubleshooting](#troubleshooting)
-18. [For developers](#for-developers)
-19. [Similar projects](#similar-projects)
-20. [Credits](#credits)
-21. [License](#license)
+5. [Where new windows open](#where-new-windows-open)
+6. [Shortcuts](#shortcuts)
+7. [Helper apps](#helper-apps)
+8. [Settings app: pzwm config](#settings-app-pzwm-config)
+9. [Configuration file](#configuration-file)
+10. [Workspaces and the bar](#workspaces-and-the-bar)
+11. [Monitors](#monitors)
+12. [Desktop profiles](#desktop-profiles)
+13. [Groups, bookmarks and find](#groups-bookmarks-and-find)
+14. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
+15. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
+16. [Scripting: pzwm msg](#scripting-pzwm-msg)
+17. [Works with](#works-with)
+18. [Troubleshooting](#troubleshooting)
+19. [For developers](#for-developers)
+20. [Similar projects](#similar-projects)
+21. [Credits](#credits)
+22. [License](#license)
 
 ## Features
 
@@ -51,6 +52,12 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
   the screen.
 - New windows open at the same size (90 % × 90 % of the screen by default),
   not at whatever size the app remembered.
+- **Open a window where you want it**: drag out an area (`Super+O`, or
+  `Super+Ctrl` + left drag) and the next window fills it;
+  `Super+Shift+Return` does the same and starts a terminal there.
+- **An app's windows stay together**: a second window of an app that is
+  already open (Zoom, Telegram, a browser) opens beside the first, and
+  dialog-sized ones over it, the way KDE Plasma places them.
 - Maximize, fullscreen, pin a window to the screen, half-screen tiling by
   dropping a window on a screen edge, magnetic edges.
 - Overview of all windows, and a minimap with live window previews.
@@ -66,7 +73,8 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 - **Arrange** (`Super+Shift+A` / `Super+Alt+A`): line up the focused group,
   or the whole workspace, as a grid or a row, once. Not a tiling mode.
 - **Find** (`Super+/`): search windows, groups and bookmarks by name and
-  fly there, with rofi, fuzzel or wofi as the picker.
+  fly there (zooming in when the window would stay a thumbnail), with
+  rofi, fuzzel or wofi as the picker.
 - **Camera history**: `Super+,` / `Super+.` go back and forward through
   your jumps (fit, find, overview, bookmark, minimap click), like a browser.
 - **Bookmarks**: remember a view with `Super+Alt+Shift+1…5`, fly back
@@ -168,6 +176,24 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 | **Minimap** | A small map of the whole workspace with live previews; click a window to jump to it. |
 | **Bar, launcher, notifications** | Not part of pzwm. They come from other programs such as DankMaterialShell (see [Works with](#works-with)). |
 
+## Where new windows open
+
+| Window | Opens |
+|---|---|
+| after you picked an area | filling the area: `Super+O`, then drag a rectangle (Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
+| a dialog (it has a parent window) | centered over its parent |
+| another window of an app that is already on the workspace | beside that window (right, else below, left, above: the first free side), the camera pans to show it; a window at most 60 % of the other one's size opens over it, like a dialog |
+| anything else | in the middle of the view, 90 % × 90 % of the screen |
+
+- The picked area waits up to a minute for its window and is drawn on the
+  canvas until then. Dialogs and fixed-size windows do not take it.
+- Window rules with a `position` or `size` still apply; a picked area wins
+  over them.
+- Side by side placement is on by default; `[canvas] place_near_siblings =
+  false` turns it off.
+- From scripts: `pzwm msg area`, `area spawn <command>`, `area cancel`,
+  `area rect X,Y WxH` (canvas coordinates, no mouse needed).
+
 ## Shortcuts
 
 All shortcuts can be changed in **pzwm config** (Shortcuts and Mouse pages)
@@ -207,6 +233,8 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | drop on the left or right screen edge, `Super+[` / `Super+]` | fill that half of the screen |
 | drop on the top screen edge | maximize |
 | `Super+Q` | close |
+| `Super+O`, then drag / `Super+Ctrl` + left drag | pick the area the next window opens in |
+| `Super+Shift+Return` | pick an area, then open a terminal in it |
 | `Super+Ctrl+arrows` | move the window |
 | `Super+Shift+arrows` | resize the window |
 | ``Super+` `` | scratchpad: call up or put away the drop-down terminal |
@@ -217,7 +245,7 @@ or in the `[binds]` and `[mouse]` sections of the config.
 |---|---|
 | `Super+Ctrl+G` | add the window to a group (the picker asks for its name) |
 | `Super+Alt+G` | take the window out of its group |
-| `Super+G` | collapse / expand the group (a click on a collapsed frame expands it too) |
+| `Super+G` | collapse / expand the group (a click on a collapsed frame expands it too; pressed again right away it expands the group it just collapsed) |
 | `Super+Shift+G` | fit the whole group on screen |
 | `Super+Alt` + left drag | move the whole group |
 
@@ -318,7 +346,7 @@ the old settings and shows a notification.
 |---|---|
 | `[general]` | autostart commands, scale, cursor, X11 apps, systemd session, auto reload |
 | `[input]` | keyboard layouts (at most 4), XKB options, key repeat, touchpad, pointer speed |
-| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size |
+| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size, `place_near_siblings` |
 | `[[output]]` | one block per monitor: mode, scale, position, mirror, disable |
 | `[appearance]` | gaps, borders, corners, title bars, shadows, colors (`"#RRGGBB"` or `"#RRGGBBAA"`) |
 | `[animation]` | animations on/off and their length |
@@ -377,18 +405,21 @@ triggers: `left`, `right`, `middle`, `back`, `forward`, `scroll`.
 | `scratchpad` | drop-down window |
 | `draw [on\|off\|undo\|clear\|hide\|color N\|color next]` | drawing on the canvas |
 | `arrange grid\|row\|column` | line up the focused group or the workspace |
+| `area [spawn <command>]\|cancel\|rect X,Y WxH` | pick the area the next window opens in, see [Where new windows open](#where-new-windows-open) |
 | `present [start\|stop\|next\|prev]` | presentation through the bookmarks |
 | `layout next\|<index>` | keyboard layout |
 | `reload-config`, `quit`, `vt <1-12>` | system |
 
 Mouse actions for `[mouse]`: `zoom`, `pan`, `pan-horizontal` (for
-`scroll`); `pan`, `move-window`, `resize-window`, `move-group` (for
-buttons).
+`scroll`); `pan`, `move-window`, `resize-window`, `move-group`,
+`select-area` (for buttons).
 
 **Window rules** decide how matching windows open. `app_id` and `title`
 are patterns where `*` matches anything and `?` one character, ignoring
 case; every matching rule applies and later ones win. `pzwm msg windows`
-shows app ids.
+shows app ids. Rules are checked when the window opens and again during
+its first 5 seconds (until you move it), so apps that set their title
+late, such as Chrome and Electron apps, match too.
 
 ```toml
 [[rule]]
@@ -611,7 +642,8 @@ an SVG icon get the card without one). `semantic_zoom = 0` turns it off.
 
 - **Screen sharing** (browsers, Discord, OBS): install
   `xdg-desktop-portal-wlr`. The installed `pzwm-portals.conf` sends screen
-  sharing and screenshot requests to it.
+  sharing and screenshot requests to it. pzwm reports every captured frame
+  as changed (`copy_with_damage`), so the stream stays live.
 - **Screenshots**: `Print` saves the screen to `~/Pictures/Screenshots`,
   `Super+Shift+S` copies a selected area. Both use `grim` and `slurp`,
   which work through wlr-screencopy.
@@ -702,6 +734,8 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | Bar shows no workspaces | Check that `umbriel` is installed (`which umbriel`) and that DMS was started by pzwm |
 | A keyboard layout is missing | XKB allows at most 4 layouts; the 5th in `layouts` is ignored |
 | Screen sharing shows nothing | Install `xdg-desktop-portal-wlr`, then log in again |
+| Screen sharing (Discord, browser) shows one still picture | Fixed in pzwm: frames copied with damage now report it, earlier builds sent none and the stream never updated. Rebuild and log in again |
+| Tray icons are missing in the DMS bar | Add the **System Tray** widget to the bar (DMS settings → Widgets), or `{"id": "systemTray", "enabled": true}` to `rightWidgets` in `~/.config/DankMaterialShell/settings.json`. Apps that close to the tray (Discord, Telegram) show there |
 | X11 apps do not start | Install `xwayland-satellite` |
 | Chrome/Chromium leaves fullscreen video after ~1.5 s | Fixed in pzwm: frames now report presentation feedback (Chromium 151+ quits fullscreen when every frame reads as discarded). Rebuild and log in again |
 | Wallpaper on a mirrored TV leaves bars on the right and bottom | Fixed in pzwm: a mirror now draws surfaces at its own scale. Rebuild and log in again |
@@ -732,6 +766,7 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | `src/toplevels.rs` | window lists for taskbars (foreign-toplevel) |
 | `src/output_management.rs`, `src/gamma.rs` | monitor tools and night light |
 | `src/rules.rs`, `src/scratchpad.rs` | window rules, drop-down window |
+| `src/area.rs` | picked area for the next window, placing an app's windows side by side |
 | `src/draw.rs`, `src/render/drawings.rs` | drawing on the canvas: strokes, eraser, saving, rendering |
 | `src/present.rs`, `src/arrange.rs` | presentation through bookmarks, one-shot layouts |
 | `src/icons.rs`, `src/render/semantic.rs` | app icon lookup, semantic-zoom cards |

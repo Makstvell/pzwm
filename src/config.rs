@@ -139,6 +139,9 @@ pub struct Canvas {
     /// Below this zoom windows turn into cards with their app icon
     /// (0 turns it off).
     pub semantic_zoom: f64,
+    /// A new window of an app that already has one on the workspace opens
+    /// beside it (dialog-sized ones over it) instead of in the middle.
+    pub place_near_siblings: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -276,6 +279,8 @@ pub enum MouseAction {
     ResizeWindow,
     /// Drag: move the window's whole group (the window alone without one).
     MoveGroup,
+    /// Drag: pick the area the next window opens in, see area.rs.
+    SelectArea,
 }
 
 impl MouseAction {
@@ -287,6 +292,7 @@ impl MouseAction {
             "move-window" | "move" => Self::MoveWindow,
             "resize-window" | "resize" => Self::ResizeWindow,
             "move-group" => Self::MoveGroup,
+            "select-area" | "area" => Self::SelectArea,
             _ => return None,
         })
     }
@@ -415,6 +421,7 @@ impl Default for Canvas {
             new_window_width: 0.9,
             new_window_height: 0.9,
             semantic_zoom: 0.3,
+            place_near_siblings: true,
         }
     }
 }

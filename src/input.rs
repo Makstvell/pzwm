@@ -555,6 +555,10 @@ impl State {
             under,
             Under::Empty | Under::Decoration { .. } | Under::Surface { layer: None, .. }
         );
+        if self.area.selecting && over_canvas && button == BTN_LEFT {
+            grabs::start_area(self, serial, button);
+            return;
+        }
         if self.draw.active && over_canvas {
             let shift = self
                 .seat
@@ -663,6 +667,7 @@ impl State {
                 grabs::start_pan(self, serial, button);
                 true
             }
+            MouseAction::SelectArea => grabs::start_area(self, serial, button),
             MouseAction::MoveGroup => {
                 let Some(window) = window else {
                     return false;

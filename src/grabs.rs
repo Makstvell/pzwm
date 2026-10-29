@@ -60,6 +60,13 @@ pub enum Interaction {
         id: u64,
         erase: bool,
     },
+    /// Dragging out the area for the next window, see area.rs.
+    Area {
+        output: Output,
+        ws: usize,
+        /// Corner where the drag started, canvas units.
+        start: Point<f64, Logical>,
+    },
     Resize {
         id: u64,
         edges: ResizeEdge,
@@ -144,6 +151,23 @@ pub fn start_draw(
     );
 }
 
+/// Starts dragging out the area the next window opens in.
+pub fn start_area(state: &mut State, serial: Serial, button: u32) -> bool {
+    let Some(output) = state.active_output() else {
+        return false;
+    };
+    let ws = state.output_ws(&output);
+    let start = state.camera(&output).to_canvas(state.cursor_local(&output));
+    begin(
+        state,
+        Interaction::Area { output, ws, start },
+        CursorIcon::Crosshair,
+        serial,
+        button,
+    );
+    true
+}
+
 /// Starts dragging the focused window's group; a window outside any group
 /// is moved alone. Returns false when nothing is focused.
 pub fn start_group_move(state: &mut State, serial: Serial, button: u32) -> bool {
@@ -194,6 +218,8 @@ pub fn start_move_with_button(state: &mut State, idx: usize, serial: Serial, but
         return;
     };
     let local_screen = state.cursor_local(&output);
+    // Placed by hand now: rules that match late must not move it back.
+    state.windows[idx].late_rules = None;
     let m = &state.windows[idx];
     let id = m.id;
 
@@ -366,6 +392,10 @@ impl State {
                     id,
                     erase,
                 }
+            }
+            Interaction::Area { output, ws, start } => {
+                self.queue_redraw(&output);
+                Interaction::Area { output, ws, start }
             }
             Interaction::Resize {
                 id,
@@ -564,6 +594,9 @@ impl State {
                 } else {
                     self.draw_finished(&output, ws, id);
                 }
+            }
+            Some(Interaction::Area { output, ws, start }) => {
+                self.area_drag_finished(&output, ws, start)
             }
             Some(Interaction::Pan { .. } | Interaction::MoveGroup { .. }) | None => {}
         }

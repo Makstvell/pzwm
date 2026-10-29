@@ -64,6 +64,25 @@ impl State {
         self.queue_redraw(&output);
     }
 
+    /// A canvas window shown at under `SMALL_SHARE` of the screen both ways
+    /// at the camera's target zoom: too small to read.
+    pub fn too_small_to_use(&self, idx: usize) -> bool {
+        const SMALL_SHARE: f64 = 0.45;
+        let m = &self.windows[idx];
+        if m.placement != Placement::Canvas {
+            return false;
+        }
+        let Some(output) = self.outputs.iter().find(|o| self.output_ws(o) == m.ws) else {
+            return false;
+        };
+        let area = self.usable_area(output).size.to_f64();
+        let shown = self
+            .canvas_frame(m)
+            .size
+            .upscale(self.workspace(m.ws).target().zoom);
+        shown.w < area.w * SMALL_SHARE && shown.h < area.h * SMALL_SHARE
+    }
+
     /// Pans just enough to bring a canvas window fully into view.
     pub fn reveal(&mut self, idx: usize) {
         let m = &self.windows[idx];

@@ -103,6 +103,11 @@ pub struct Managed {
     pub hidden: bool,
     /// Group the window belongs to, see groups.rs.
     pub group: Option<String>,
+    /// Area picked for it before it opened (workspace, canvas frame), see area.rs.
+    pub area: Option<(usize, Rectangle<f64, Logical>)>,
+    /// Until then, window rules are checked again on every commit: apps
+    /// such as Chrome set their title only after the window appears.
+    pub late_rules: Option<Instant>,
 }
 
 impl Managed {
@@ -179,6 +184,8 @@ pub enum Hit {
 
 /// Screen-space margin around windows that grabs resize.
 const CASCADE_STEP: f64 = 32.0;
+/// How long rules wait for a title or app id that arrives late.
+const LATE_RULES: Duration = Duration::from_secs(5);
 const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 
 /// Centers of the three titlebar buttons in window-local coordinates
@@ -422,6 +429,8 @@ impl State {
                 scratchpad: false,
                 hidden: false,
                 group: None,
+                area: None,
+                late_rules: None,
             },
         );
     }
@@ -485,6 +494,17 @@ impl State {
         if max.w > 0 && max.h > 0 && min == max {
             return None;
         }
+        if let Some((_, rect)) = m.area {
+            let title = self.title_height(m);
+            let clamp = |v: f64, lo: i32, hi: i32| {
+                let v = (v.round() as i32).max(lo).max(1);
+                if hi > 0 { v.min(hi) } else { v }
+            };
+            return Some(Size::from((
+                clamp(rect.size.w, min.w, max.w),
+                clamp(rect.size.h - title, min.h, max.h),
+            )));
+        }
         if let Some(size) = self.app_id(m).and_then(|a| self.profile_size(&a)) {
             return Some(size);
         }
@@ -534,7 +554,16 @@ impl State {
             target.loc.x + (target.size.w - size.w) / 2.0,
             target.loc.y + (target.size.h - size.h - title) / 2.0 + title,
         ));
-        if parent_frame.is_none() {
+        let area = m.area;
+        let sibling = match (parent_frame, area) {
+            (None, None) => self.sibling_spot(idx, ws),
+            _ => None,
+        };
+        if let Some((_, rect)) = area {
+            pos = Point::from((rect.loc.x, rect.loc.y + title));
+        } else if let Some(spot) = sibling {
+            pos = spot;
+        } else if parent_frame.is_none() {
             while self.windows.iter().any(|o| {
                 o.mapped && o.ws == ws && o.placement == Placement::Canvas && {
                     let d = o.pos - pos;
@@ -545,15 +574,68 @@ impl State {
             }
         }
         let m = &mut self.windows[idx];
-        m.ws = ws;
+        let id = m.id;
+        m.ws = area.map_or(ws, |(area_ws, _)| area_ws);
         m.pos = pos;
         m.mapped = true;
         m.opened_at = Some(Instant::now());
         let from_profile = self.place_from_profile(idx);
-        if from_profile || !self.apply_rules(idx) {
+        let ruled = !from_profile && self.apply_rules(idx);
+        if !ruled {
+            if !from_profile {
+                self.windows[idx].late_rules = Some(Instant::now() + LATE_RULES);
+            }
             let window = self.windows[idx].window.clone();
             self.focus_window(Some(window));
         }
+        if let Some(idx) = self.index_of_id(id) {
+            let m = &mut self.windows[idx];
+            if let Some((area_ws, rect)) = area {
+                // The picked area wins over rules that also place the window.
+                m.ws = area_ws;
+                m.pos = pos;
+                m.area = None;
+                // The first configure went out before the title bar was
+                // known: fit the content under it now.
+                let content = Size::from((
+                    rect.size.w.round() as i32,
+                    (rect.size.h - title).round().max(1.0) as i32,
+                ));
+                if (m.size().h - content.h as f64).abs() > 1.0 {
+                    self.configure(idx, Some(content), false, false);
+                }
+            } else if sibling.is_some() && !ruled && !from_profile {
+                self.reveal(idx);
+            }
+        }
+        self.queue_redraw_all();
+    }
+
+    /// The window opened without a matching rule: its title or app id may
+    /// have come later (Chrome), so try the rules again, once, until the
+    /// user moves it or `LATE_RULES` passes.
+    pub fn late_rules(&mut self, idx: usize) {
+        let Some(until) = self.windows[idx].late_rules else {
+            return;
+        };
+        if Instant::now() >= until {
+            self.windows[idx].late_rules = None;
+            return;
+        }
+        let Some(effect) = self.rule_effect(&self.windows[idx]) else {
+            return;
+        };
+        self.windows[idx].late_rules = None;
+        if let Some(size) = effect.size {
+            // We are inside the window's commit: resize once it is handled.
+            let id = self.windows[idx].id;
+            self.loop_handle.insert_idle(move |state| {
+                if let Some(i) = state.index_of_id(id) {
+                    state.configure(i, Some(size), false, false);
+                }
+            });
+        }
+        self.apply_rules(idx);
         self.queue_redraw_all();
     }
 

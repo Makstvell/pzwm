@@ -162,6 +162,10 @@ impl State {
             self.remember_camera_of_ws(ws);
         }
         self.focus_and_center(id);
+        // From an overview the window would stay a thumbnail: zoom in on it.
+        if let Some(idx) = self.index_of_id(id).filter(|&i| self.too_small_to_use(i)) {
+            self.fit_window(idx);
+        }
     }
 }
 

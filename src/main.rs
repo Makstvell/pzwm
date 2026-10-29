@@ -1,6 +1,7 @@
 //! pzwm — an infinite-canvas Wayland compositor.
 
 mod action;
+mod area;
 mod arrange;
 mod backend;
 mod bar;

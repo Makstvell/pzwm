@@ -57,6 +57,9 @@ pub enum Action {
     Find,
     /// `draw [on|off|undo|clear|hide|color N|color next]`, see draw.rs.
     Draw(String),
+    /// `area [spawn CMD] | cancel | rect X,Y WxH`: where the next window
+    /// opens, see area.rs.
+    Area(String),
     /// Line up the focused group (or the workspace) once, see arrange.rs.
     Arrange(crate::arrange::Arrangement),
     /// `present [start|stop|next|prev]`: fly through the bookmarks.
@@ -120,6 +123,7 @@ impl Action {
             "scratchpad" | "toggle-scratchpad" => Self::Scratchpad,
             "find" | "search" => Self::Find,
             "draw" => Self::Draw(arg.to_string()),
+            "area" => Self::Area(arg.to_string()),
             "arrange" => Self::Arrange(crate::arrange::Arrangement::parse(arg)?),
             "present" | "presentation" => Self::Present(arg.to_string()),
             "focus" => match arg {
@@ -188,6 +192,11 @@ mod tests {
         assert_eq!(Action::parse("scratchpad"), Some(Action::Scratchpad));
         assert_eq!(Action::parse("find"), Some(Action::Find));
         assert_eq!(Action::parse("draw"), Some(Action::Draw(String::new())));
+        assert_eq!(Action::parse("area"), Some(Action::Area(String::new())));
+        assert_eq!(
+            Action::parse("area spawn foot"),
+            Some(Action::Area("spawn foot".into()))
+        );
         assert_eq!(
             Action::parse("draw color 2"),
             Some(Action::Draw("color 2".into()))

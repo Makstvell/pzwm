@@ -182,6 +182,18 @@ impl State {
             }
             return;
         }
+        let idx = if m.late_rules.is_some() {
+            // Rules may refocus and so reorder the window list.
+            let id = m.id;
+            self.late_rules(idx);
+            match self.index_of_id(id) {
+                Some(i) => i,
+                None => return,
+            }
+        } else {
+            idx
+        };
+        let m = &mut self.windows[idx];
         if let Some(anchor) = m.anchor {
             let size = m.window.geometry().size.to_f64();
             if matches!(
@@ -201,7 +213,7 @@ impl State {
 
     fn ensure_initial_configure(&mut self, surface: &WlSurface) {
         if let Some(idx) = self.index_of_surface(surface) {
-            if let Some(toplevel) = self.windows[idx].window.toplevel() {
+            if let Some(toplevel) = self.windows[idx].window.toplevel().cloned() {
                 let sent = with_states(surface, |states| {
                     states
                         .data_map
@@ -209,6 +221,7 @@ impl State {
                         .is_some_and(|d| d.lock().is_ok_and(|d| d.initial_configure_sent))
                 });
                 if !sent {
+                    self.claim_area(idx);
                     if let Some(size) = self.initial_size(idx) {
                         toplevel.with_pending_state(|s| s.size = Some(size));
                     }

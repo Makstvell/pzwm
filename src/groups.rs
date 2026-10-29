@@ -237,12 +237,20 @@ impl State {
             let local = self.cursor_local(&output);
             self.collapsed_group_at(&output, local)
         };
-        let name = match (name, self.focused_group()) {
-            (Some(n), _) => Some(n.to_string()),
-            (None, Some(_)) => None,
-            (None, None) => under_cursor(),
+        // Collapsing hands focus to another window, often of another group:
+        // pressing the key again still means the group just collapsed.
+        let focused_id = self.focused_index().map(|i| self.windows[i].id);
+        let just_collapsed = self
+            .last_collapsed
+            .as_ref()
+            .filter(|(g, handed)| *handed == focused_id && self.collapsed_groups.contains(g))
+            .map(|(g, _)| g.clone());
+        let name = match name {
+            Some(n) => Some(n.to_string()),
+            None => under_cursor().or(just_collapsed),
         };
         let (name, ws) = self.resolve_group(name.as_deref())?;
+        self.last_collapsed = None;
         if self.collapsed_groups.remove(&name) {
             // Expanded: focus its top window.
             if let Some(&i) = self.group_members(&name, ws).first() {
@@ -264,6 +272,8 @@ impl State {
                 .map(|m| m.window.clone());
             self.focus_window(next);
         }
+        let handed = self.focused_index().map(|i| self.windows[i].id);
+        self.last_collapsed = Some((name.clone(), handed));
         self.queue_redraw_all();
         Ok(format!("group {name} collapsed"))
     }

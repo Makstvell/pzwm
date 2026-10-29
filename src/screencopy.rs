@@ -46,6 +46,8 @@ pub struct PendingCopy {
     output: Output,
     region: Rectangle<i32, Physical>,
     cursor: bool,
+    /// Asked with `copy_with_damage`: the client needs `damage` before `ready`.
+    with_damage: bool,
 }
 
 pub fn init(dh: &DisplayHandle) {
@@ -154,9 +156,9 @@ impl Dispatch<ZwlrScreencopyFrameV1, Option<FrameData>> for State {
         _dh: &DisplayHandle,
         _data_init: &mut DataInit<'_, State>,
     ) {
-        let buffer = match request {
-            zwlr_screencopy_frame_v1::Request::Copy { buffer }
-            | zwlr_screencopy_frame_v1::Request::CopyWithDamage { buffer } => buffer,
+        let (buffer, with_damage) = match request {
+            zwlr_screencopy_frame_v1::Request::Copy { buffer } => (buffer, false),
+            zwlr_screencopy_frame_v1::Request::CopyWithDamage { buffer } => (buffer, true),
             _ => return,
         };
         let Some(data) = data else { return };
@@ -173,6 +175,7 @@ impl Dispatch<ZwlrScreencopyFrameV1, Option<FrameData>> for State {
             output: data.output.clone(),
             region: data.region,
             cursor: data.cursor,
+            with_damage,
         });
         let output = data.output.clone();
         state.queue_redraw(&output);
@@ -203,6 +206,13 @@ pub fn process(state: &mut State, renderer: &mut GlesRenderer, output: &Output) 
         match result {
             Ok(()) => {
                 copy.frame.flags(Flags::empty());
+                // Every copy is a fresh render, so all of it counts as changed.
+                // Without this, screen sharing through the portal (Discord,
+                // browsers) reads "nothing changed" and keeps the first frame.
+                if copy.with_damage && copy.frame.version() >= 2 {
+                    let size = copy.region.size;
+                    copy.frame.damage(0, 0, size.w as u32, size.h as u32);
+                }
                 let t: std::time::Duration = state.clock.now().into();
                 let secs = t.as_secs();
                 copy.frame

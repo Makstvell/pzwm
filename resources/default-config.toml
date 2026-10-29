@@ -70,6 +70,9 @@ new_window_height = 0.9  # dialogs and fixed-size windows keep their own size
 # Semantic zoom: below this zoom windows turn into cards in their app's
 # color with the app icon (0 turns it off).
 semantic_zoom = 0.3
+# A new window of an app that already has one on the workspace (a second
+# Zoom or Telegram window) opens beside it; dialog-sized ones open over it.
+place_near_siblings = true
 
 [minimap]
 # Map of the whole workspace with live previews of every window and the
@@ -203,7 +206,8 @@ pinned_accent = "#f59e0b"
 # Mouse binds work anywhere, also over windows: "Mods+Trigger" = "action".
 # Triggers: left, right, middle, back, forward, scroll.
 # Drag actions: pan, move-window, resize-window, move-group (the window's
-# whole group; a window without a group moves alone).
+# whole group; a window without a group moves alone), select-area (the area
+# the next window opens in).
 # Scroll actions: zoom (wheel zooms, touchpad pans), pan, pan-horizontal.
 # Set a bind to "none" to remove it.
 [mouse]
@@ -215,6 +219,8 @@ pinned_accent = "#f59e0b"
 "Super+Shift+left" = "move-window"
 "Super+right" = "resize-window"
 "Super+Alt+left" = "move-group"
+# Drag out the area the next window opens in.
+"Super+Ctrl+left" = "select-area"
 
 [binds]
 "Super+Return" = "spawn ${TERMINAL:-foot}"
@@ -321,6 +327,9 @@ pinned_accent = "#f59e0b"
 # Draw on the canvas; show or hide the drawings.
 "Super+Shift+D" = "draw"
 "Super+Alt+D" = "draw hide"
+# Pick an area with the mouse: the next window opens there (Esc cancels).
+"Super+O" = "area"
+"Super+Shift+Return" = "area spawn ${TERMINAL:-foot}"
 # Presentation through the bookmarks.
 "Super+F5" = "present"
 "Super+Next" = "present next"

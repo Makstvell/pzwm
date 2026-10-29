@@ -57,7 +57,10 @@ class ProfilesPage(Adw.PreferencesPage):
         self.window = window
         self.run = run_pzwm
         self.groups: list[Adw.PreferencesGroup] = []
+        self.name_entry: Adw.EntryRow | None = None
         self.rebuild()
+        # Opened with Super+Shift+P to save: the name can be typed at once.
+        self.connect("map", lambda _page: self.name_entry and self.name_entry.grab_focus())
 
     # ---- talking to pzwm ---------------------------------------------------
 
@@ -92,6 +95,7 @@ class ProfilesPage(Adw.PreferencesPage):
         entry.set_show_apply_button(True)
         entry.connect("apply", self._save_new)
         save.add(entry)
+        self.name_entry = entry
         self._push(save)
 
         ok, text = self._msg("list", "--json")
