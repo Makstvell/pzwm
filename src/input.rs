@@ -203,6 +203,12 @@ impl State {
                     );
                 }
             }
+            InputEvent::DeviceAdded { device } => self.tablet_device_added(&device),
+            InputEvent::DeviceRemoved { device } => self.tablet_device_removed(&device),
+            InputEvent::TabletToolAxis { event } => self.tablet_axis::<B>(event),
+            InputEvent::TabletToolProximity { event } => self.tablet_proximity::<B>(event),
+            InputEvent::TabletToolTip { event } => self.tablet_tip::<B>(event),
+            InputEvent::TabletToolButton { event } => self.tablet_button::<B>(event),
             _ => {}
         }
     }
@@ -286,7 +292,7 @@ impl State {
         self.pointer_moved(time);
     }
 
-    fn pointer_moved(&mut self, time: u32) {
+    pub(crate) fn pointer_moved(&mut self, time: u32) {
         self.check_pending_middle();
         let pointer = self.pointer.clone();
         let under = self.under();
@@ -331,7 +337,7 @@ impl State {
         self.pointer_moved(time);
     }
 
-    fn focus_of(&self, under: &Under) -> Option<(WlSurface, Point<f64, Logical>)> {
+    pub(crate) fn focus_of(&self, under: &Under) -> Option<(WlSurface, Point<f64, Logical>)> {
         match under {
             Under::Surface {
                 surface,
@@ -342,7 +348,7 @@ impl State {
         }
     }
 
-    fn event_location(&self, under: &Under) -> Point<f64, Logical> {
+    pub(crate) fn event_location(&self, under: &Under) -> Point<f64, Logical> {
         match under {
             Under::Surface { location, .. } => *location,
             _ => self.cursor,
@@ -602,6 +608,16 @@ impl State {
                 }
             }
             Under::Empty => {
+                if button == BTN_LEFT {
+                    let collapsed = self.active_output().and_then(|o| {
+                        let local = self.cursor_local(&o);
+                        self.collapsed_group_at(&o, local)
+                    });
+                    if let Some(name) = collapsed {
+                        let _ = self.group_toggle(Some(&name));
+                        return;
+                    }
+                }
                 let pans = button == BTN_MIDDLE
                     || (button == BTN_LEFT && self.config.canvas.left_drag_pans);
                 if pans {
@@ -632,6 +648,14 @@ impl State {
             MouseAction::Pan | MouseAction::PanHorizontal | MouseAction::Zoom => {
                 grabs::start_pan(self, serial, button);
                 true
+            }
+            MouseAction::MoveGroup => {
+                let Some(window) = window else {
+                    return false;
+                };
+                let w = self.windows[window].window.clone();
+                self.focus_window(Some(w));
+                grabs::start_group_move(self, serial, button)
             }
             MouseAction::MoveWindow | MouseAction::ResizeWindow => {
                 let Some(window) = window else {
@@ -686,12 +710,14 @@ impl State {
                 let id = self.windows[idx].id;
                 let w = self.windows[idx].window.clone();
                 self.focus_window(Some(w));
+                self.remember_camera(&output);
                 if let Some(idx) = self.index_of_id(id) {
                     self.center_on(idx);
                 }
                 self.close_map_popup();
             }
             MapHit::Canvas => {
+                self.remember_camera(&output);
                 self.minimap_jump(&output, &layout, local, true);
                 grabs::start_map_drag(self, output, layout, serial);
             }

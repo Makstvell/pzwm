@@ -1,7 +1,8 @@
 //! `pzwm msg …`: a line-based unix socket for scripts and bars.
 //!
 //! Requests are one line: any bind action (`workspace 3`, `zoom-in`,
-//! `spawn foot`), `windows` / `outputs` for state as text, and the
+//! `spawn foot`), `windows` / `outputs` for state as text (`--json` for
+//! JSON), `subscribe` for the event stream (events.rs), and the
 //! `pointer …` family that drives the pointer for tests.
 
 use std::{
@@ -55,6 +56,10 @@ fn serve(state: &mut State, stream: UnixStream) -> std::io::Result<()> {
     stream.set_read_timeout(Some(Duration::from_millis(500)))?;
     let mut line = String::new();
     BufReader::new(&stream).read_line(&mut line)?;
+    if line.trim() == "subscribe" {
+        state.events_subscribe(stream);
+        return Ok(());
+    }
     let reply = handle(state, line.trim());
     (&stream).write_all(reply.as_bytes())?;
     (&stream).write_all(b"\n")
@@ -64,12 +69,27 @@ fn handle(state: &mut State, request: &str) -> String {
     let words: Vec<&str> = request.split_whitespace().collect();
     match words.as_slice() {
         ["windows"] => windows(state),
+        ["windows", "--json"] => {
+            let list: Vec<_> = state
+                .windows
+                .iter()
+                .filter(|m| m.mapped)
+                .map(|m| state.window_json(m))
+                .collect();
+            serde_json::Value::from(list).to_string()
+        }
         ["outputs"] => outputs(state),
+        ["outputs", "--json"] => serde_json::Value::from(state.outputs_json()).to_string(),
+        ["heads", "--json"] => heads_json(state),
+        ["bookmark", rest @ ..] => reply(state.bookmark_command(rest)),
+        ["group", rest @ ..] => reply(state.group_command(rest)),
+        ["find-list"] => state.find_list(),
+        ["find-select", ..] => {
+            let line = request.trim_start().trim_start_matches("find-select");
+            reply(state.find_select(line))
+        }
         ["pointer", rest @ ..] => pointer(state, rest),
-        ["profile", rest @ ..] => match state.profile_command(rest) {
-            Ok(msg) => msg,
-            Err(err) => format!("error: {err}"),
-        },
+        ["profile", rest @ ..] => reply(state.profile_command(rest)),
         ["reload"] => match state.reload_config() {
             Ok(()) => "ok: config reloaded".into(),
             Err(err) => format!("error: {err}"),
@@ -82,6 +102,45 @@ fn handle(state: &mut State, request: &str) -> String {
             None => format!("error: unknown request `{request}`"),
         },
     }
+}
+
+/// Every connected monitor, also disabled ones, with the modes it offers:
+/// what display settings need.
+fn heads_json(state: &State) -> String {
+    let heads: Vec<serde_json::Value> = crate::backend::heads(state)
+        .into_iter()
+        .map(|h| {
+            let modes: Vec<serde_json::Value> = h
+                .modes
+                .iter()
+                .map(|m| {
+                    serde_json::json!({
+                        "width": m.width,
+                        "height": m.height,
+                        "refresh": m.refresh as f64 / 1000.0,
+                        "preferred": m.preferred,
+                    })
+                })
+                .collect();
+            serde_json::json!({
+                "name": h.name,
+                "make": h.make,
+                "model": h.model,
+                "physical_size": [h.physical_size.0, h.physical_size.1],
+                "enabled": h.enabled,
+                "current_mode": h.current_mode,
+                "modes": modes,
+                "x": h.position.0,
+                "y": h.position.1,
+                "scale": h.scale,
+            })
+        })
+        .collect();
+    serde_json::Value::from(heads).to_string()
+}
+
+fn reply(result: Result<String, String>) -> String {
+    result.unwrap_or_else(|err| format!("error: {err}"))
 }
 
 fn windows(state: &State) -> String {
@@ -171,8 +230,7 @@ fn pointer(state: &mut State, args: &[&str]) -> String {
     }
 }
 
-/// Client side of `pzwm msg`.
-pub fn send(request: &str) -> anyhow::Result<String> {
+fn connect(request: &str) -> anyhow::Result<UnixStream> {
     let path = match std::env::var("PZWM_SOCKET") {
         Ok(p) => PathBuf::from(p),
         Err(_) => {
@@ -188,6 +246,23 @@ pub fn send(request: &str) -> anyhow::Result<String> {
     })?;
     stream.write_all(request.as_bytes())?;
     stream.write_all(b"\n")?;
+    Ok(stream)
+}
+
+/// Client side of `pzwm msg subscribe`: prints events until pzwm exits.
+pub fn subscribe() -> anyhow::Result<()> {
+    let stream = connect("subscribe")?;
+    let mut out = std::io::stdout().lock();
+    for line in BufReader::new(stream).lines() {
+        writeln!(out, "{}", line?)?;
+        out.flush()?;
+    }
+    Ok(())
+}
+
+/// Client side of `pzwm msg`.
+pub fn send(request: &str) -> anyhow::Result<String> {
+    let mut stream = connect(request)?;
     // The server writes the whole reply and closes the connection.
     let mut reply = String::new();
     std::io::Read::read_to_string(&mut stream, &mut reply)?;

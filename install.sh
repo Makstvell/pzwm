@@ -51,6 +51,7 @@ FILES=(
     "$PREFIX/share/xdg-desktop-portal/pzwm-portals.conf"
     "$PREFIX/bin/pzwm-config"
     "$PREFIX/share/applications/pzwm-config.desktop"
+    "$PREFIX/share/applications/pzwm-displays.desktop"
     "$PREFIX/share/pzwm-config"
 )
 CONFIG_APP_FILES=(pzwm_config.py pages.py schema.py tomlpatch.py)
@@ -103,6 +104,8 @@ done
 printf '#!/bin/sh\nexec python3 %s/share/pzwm-config/pzwm_config.py "$@"\n' "$PREFIX" \
     | $SUDO install -Dm755 /dev/stdin "$PREFIX/bin/pzwm-config"
 $SUDO install -Dm644 resources/pzwm-config.desktop "$PREFIX/share/applications/pzwm-config.desktop"
+# "Display Settings" in the launcher: the Monitors page (only under pzwm).
+$SUDO install -Dm644 resources/pzwm-displays.desktop "$PREFIX/share/applications/pzwm-displays.desktop"
 for f in "${FILES[@]}"; do ok "$f"; done
 if [ "$PREFIX" != /usr ] && [ "$PREFIX" != /usr/local ]; then
     warn "$PREFIX/bin must be in PATH for display managers to find pzwm-session"

@@ -34,6 +34,8 @@ pub struct SavedWindow {
     pub h: i32,
     #[serde(default)]
     pub maximized: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,16 +81,22 @@ impl PendingPlacements {
     }
 }
 
-fn dir() -> PathBuf {
+/// `$XDG_STATE_HOME/pzwm`: profiles, bookmarks.
+pub fn state_dir() -> PathBuf {
     let base = std::env::var_os("XDG_STATE_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/state")))
         .unwrap_or_else(|| PathBuf::from("/tmp"));
-    base.join("pzwm/profiles")
+    base.join("pzwm")
+}
+
+fn dir() -> PathBuf {
+    state_dir().join("profiles")
 }
 
 /// Profile names become file names, so only plain words are allowed.
-fn valid_name(name: &str) -> bool {
+/// Bookmark and group names follow the same rule.
+pub fn valid_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 64
         && name
@@ -197,6 +205,7 @@ impl State {
             w: g.size.w,
             h: g.size.h,
             maximized: m.placement == Placement::Maximized,
+            group: m.group.clone(),
         })
     }
 
@@ -289,6 +298,7 @@ impl State {
         m.ws = w.ws;
         m.pos = Point::from((w.x, w.y));
         m.output = None;
+        m.group = w.group.clone();
         self.configure(
             idx,
             Some(Size::from((w.w.max(1), w.h.max(1)))),
@@ -358,6 +368,7 @@ mod tests {
             w: 800,
             h: 600,
             maximized: false,
+            group: None,
         }
     }
 

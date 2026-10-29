@@ -28,7 +28,7 @@ use crate::{canvas::ease_out, config::Config, state::State};
 
 /// `share` (clamped to 0.1 .. 1.0) of `len`, kept within the client's
 /// `min`/`max` size; a `max` of 0 means no limit.
-fn share_of(len: f64, share: f64, min: i32, max: i32) -> i32 {
+pub fn share_of(len: f64, share: f64, min: i32, max: i32) -> i32 {
     let want = ((len * share.clamp(0.1, 1.0)).round() as i32)
         .max(min)
         .max(1);
@@ -97,6 +97,12 @@ pub struct Managed {
     pub mapped: bool,
     pub opened_at: Option<Instant>,
     pub anchor: Option<ResizeAnchor>,
+    /// The scratchpad window, see scratchpad.rs.
+    pub scratchpad: bool,
+    /// Put away: the scratchpad while it is not called up.
+    pub hidden: bool,
+    /// Group the window belongs to, see groups.rs.
+    pub group: Option<String>,
 }
 
 impl Managed {
@@ -224,8 +230,18 @@ impl State {
         m.output.as_deref().and_then(|n| self.output_by_name(n))
     }
 
+    /// Mapped and not put away (scratchpad, collapsed group).
+    pub fn shown(&self, m: &Managed) -> bool {
+        m.mapped
+            && !m.hidden
+            && !m
+                .group
+                .as_ref()
+                .is_some_and(|g| self.collapsed_groups.contains(g))
+    }
+
     pub fn view(&self, m: &Managed, output: &Output) -> Option<View> {
-        if !m.mapped {
+        if !self.shown(m) {
             return None;
         }
         let on_output = || m.output.as_deref() == Some(output.name().as_str());
@@ -403,6 +419,9 @@ impl State {
                 mapped: false,
                 opened_at: None,
                 anchor: None,
+                scratchpad: false,
+                hidden: false,
+                group: None,
             },
         );
     }
@@ -414,6 +433,16 @@ impl State {
                 .data_map
                 .get::<XdgToplevelSurfaceData>()
                 .and_then(|d| d.lock().ok().and_then(|d| d.app_id.clone()))
+        })
+    }
+
+    pub fn title(&self, m: &Managed) -> Option<String> {
+        let toplevel = m.window.toplevel()?;
+        with_states(toplevel.wl_surface(), |states| {
+            states
+                .data_map
+                .get::<XdgToplevelSurfaceData>()
+                .and_then(|d| d.lock().ok().and_then(|d| d.title.clone()))
         })
     }
 
@@ -460,11 +489,28 @@ impl State {
             return Some(size);
         }
         let area = self.usable_area(&self.active_output()?).size.to_f64();
-        let canvas = &self.config.canvas;
         let title = self.title_height(m);
+        let (share_w, share_h) = match self.rule_effect(m) {
+            Some(rule) if rule.size.is_some() => {
+                let size = rule.size?;
+                let w = size.w.max(min.w);
+                let h = size.h.max(min.h);
+                return Some(Size::from((
+                    if max.w > 0 { w.min(max.w) } else { w },
+                    if max.h > 0 { h.min(max.h) } else { h },
+                )));
+            }
+            Some(rule) if rule.scratchpad => {
+                (self.config.scratchpad.width, self.config.scratchpad.height)
+            }
+            _ => (
+                self.config.canvas.new_window_width,
+                self.config.canvas.new_window_height,
+            ),
+        };
         Some(Size::from((
-            share_of(area.w, canvas.new_window_width, min.w, max.w),
-            share_of(area.h - title, canvas.new_window_height, min.h, max.h),
+            share_of(area.w, share_w, min.w, max.w),
+            share_of(area.h - title, share_h, min.h, max.h),
         )))
     }
 
@@ -503,9 +549,11 @@ impl State {
         m.pos = pos;
         m.mapped = true;
         m.opened_at = Some(Instant::now());
-        self.place_from_profile(idx);
-        let window = self.windows[idx].window.clone();
-        self.focus_window(Some(window));
+        let from_profile = self.place_from_profile(idx);
+        if from_profile || !self.apply_rules(idx) {
+            let window = self.windows[idx].window.clone();
+            self.focus_window(Some(window));
+        }
         self.queue_redraw_all();
     }
 
@@ -547,7 +595,7 @@ impl State {
             let next = self
                 .windows
                 .iter()
-                .find(|m| m.mapped && (m.ws == ws || m.placement == Placement::Pinned))
+                .find(|m| self.shown(m) && (m.ws == ws || m.placement == Placement::Pinned))
                 .map(|m| m.window.clone());
             self.focus_window(next);
         }

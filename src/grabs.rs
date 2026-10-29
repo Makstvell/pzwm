@@ -46,6 +46,13 @@ pub enum Interaction {
     },
     /// Dragging the view rectangle around the minimap.
     MapDrag { output: Output, layout: MapLayout },
+    /// Moving a whole group (`move-group` mouse bind).
+    MoveGroup {
+        name: String,
+        ws: usize,
+        output: Output,
+        last: Point<f64, Logical>,
+    },
     Resize {
         id: u64,
         edges: ResizeEdge,
@@ -100,6 +107,37 @@ pub fn start_pan(state: &mut State, serial: Serial, button: u32) {
         serial,
         button,
     );
+}
+
+/// Starts dragging the focused window's group; a window outside any group
+/// is moved alone. Returns false when nothing is focused.
+pub fn start_group_move(state: &mut State, serial: Serial, button: u32) -> bool {
+    let Some(idx) = state.focused_index() else {
+        return false;
+    };
+    let m = &state.windows[idx];
+    let (Some(name), Placement::Canvas) = (m.group.clone(), m.placement) else {
+        start_move_with_button(state, idx, serial, button);
+        return true;
+    };
+    let ws = m.ws;
+    let Some(output) = state.active_output() else {
+        return false;
+    };
+    let last = state.cursor;
+    begin(
+        state,
+        Interaction::MoveGroup {
+            name,
+            ws,
+            output,
+            last,
+        },
+        CursorIcon::Grabbing,
+        serial,
+        button,
+    );
+    true
 }
 
 pub fn start_map_drag(state: &mut State, output: Output, layout: MapLayout, serial: Serial) {
@@ -260,6 +298,22 @@ impl State {
                 self.minimap_jump(&output, &layout, local, false);
                 Interaction::MapDrag { output, layout }
             }
+            Interaction::MoveGroup {
+                name,
+                ws,
+                output,
+                last,
+            } => {
+                let zoom = self.camera(&output).zoom;
+                let delta = (self.cursor - last).downscale(zoom);
+                self.move_group_by(&name, ws, delta);
+                Interaction::MoveGroup {
+                    name,
+                    ws,
+                    output,
+                    last: self.cursor,
+                }
+            }
             Interaction::Resize {
                 id,
                 edges,
@@ -311,7 +365,9 @@ impl State {
         let mut targets: Vec<Rectangle<f64, Logical>> = self
             .windows
             .iter()
-            .filter(|o| o.id != id && o.mapped && o.ws == ws && o.placement == Placement::Canvas)
+            .filter(|o| {
+                o.id != id && self.shown(o) && o.ws == ws && o.placement == Placement::Canvas
+            })
             .map(|o| self.canvas_frame(o))
             .collect();
         targets.push(cam.visible(self.usable_area(&output).to_f64()));
@@ -444,7 +500,7 @@ impl State {
                 }
             }
             Some(Interaction::MapDrag { .. }) => self.map_drag_ended(),
-            Some(Interaction::Pan { .. }) | None => {}
+            Some(Interaction::Pan { .. } | Interaction::MoveGroup { .. }) | None => {}
         }
         // We are inside the pointer's grab callback: touching the pointer
         // here would deadlock, so refresh focus once the grab is gone.

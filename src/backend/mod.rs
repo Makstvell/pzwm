@@ -56,6 +56,93 @@ pub fn switch_vt(state: &mut State, vt: i32) {
     }
 }
 
+/// A monitor as output-management clients see it, connected or not
+/// enabled.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeadInfo {
+    pub name: String,
+    pub make: String,
+    pub model: String,
+    /// Millimetres.
+    pub physical_size: (i32, i32),
+    pub modes: Vec<ModeInfo>,
+    /// Index into `modes` while enabled.
+    pub current_mode: Option<usize>,
+    pub enabled: bool,
+    pub position: (i32, i32),
+    pub scale: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ModeInfo {
+    pub width: i32,
+    pub height: i32,
+    /// mHz.
+    pub refresh: i32,
+    pub preferred: bool,
+}
+
+/// Every monitor pzwm could drive.
+pub fn heads(state: &State) -> Vec<HeadInfo> {
+    match &state.backend {
+        Backend::Udev(data) => udev::heads(state, data),
+        _ => state
+            .outputs
+            .iter()
+            .map(|o| {
+                let mode = o.current_mode().unwrap_or(smithay::output::Mode {
+                    size: (0, 0).into(),
+                    refresh: 0,
+                });
+                let g = state.output_geometry(o);
+                HeadInfo {
+                    name: o.name(),
+                    make: o.physical_properties().make,
+                    model: o.physical_properties().model,
+                    physical_size: (0, 0),
+                    modes: vec![ModeInfo {
+                        width: mode.size.w,
+                        height: mode.size.h,
+                        refresh: mode.refresh,
+                        preferred: true,
+                    }],
+                    current_mode: Some(0),
+                    enabled: true,
+                    position: (g.loc.x, g.loc.y),
+                    scale: o.current_scale().fractional_scale(),
+                }
+            })
+            .collect(),
+    }
+}
+
+/// Applies changed monitor settings (config reload or output management):
+/// modes, enabling and mirroring on a TTY, scale and position everywhere.
+pub fn reapply_outputs(state: &mut State) {
+    if matches!(state.backend, Backend::Udev(_)) {
+        udev::reapply_outputs(state);
+    }
+    state.apply_output_scales();
+    state.relayout_outputs();
+}
+
+/// Length of the output's gamma ramp, `None` when it cannot be set.
+pub fn gamma_size(state: &State, output: &Output) -> Option<u32> {
+    match &state.backend {
+        Backend::Udev(data) => udev::gamma_size(data, output),
+        _ => None,
+    }
+}
+
+/// Sets the gamma ramp (red, green, blue, `gamma_size` values each), or
+/// restores a linear one with `None`.
+pub fn set_gamma(state: &State, output: &Output, ramp: Option<&[u16]>) -> Result<(), String> {
+    match &state.backend {
+        Backend::Udev(data) => udev::set_gamma(data, output, ramp),
+        _ => Err("gamma needs a TTY session".into()),
+    }
+}
+
 pub fn reconfigure_input(state: &mut State) {
     let input = state.config.input.clone();
     if let Backend::Udev(data) = &mut state.backend {

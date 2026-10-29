@@ -15,7 +15,8 @@ use smithay::{
             gbm::{GbmAllocator, GbmBufferFlags, GbmDevice},
         },
         drm::{
-            DrmDevice, DrmDeviceFd, DrmEvent, DrmNode, NodeType,
+            DrmDevice, DrmDeviceFd, DrmEvent, DrmEventMetadata, DrmEventTime as DrmTime, DrmNode,
+            NodeType,
             compositor::FrameFlags,
             exporter::gbm::GbmFramebufferExporter,
             output::{DrmOutput, DrmOutputManager, DrmOutputRenderElements},
@@ -31,6 +32,7 @@ use smithay::{
         session::{Event as SessionEvent, Session, libseat::LibSeatSession},
         udev::{UdevBackend, UdevEvent, all_gpus, primary_gpu},
     },
+    desktop::utils::OutputPresentationFeedback,
     output::{Mode as WlMode, Output, PhysicalProperties, Scale},
     reexports::{
         calloop::{
@@ -43,19 +45,28 @@ use smithay::{
         },
         input::{DeviceCapability, Libinput},
         rustix::fs::OFlags,
+        wayland_protocols::wp::presentation_time::server::wp_presentation_feedback::Kind,
         wayland_server::{Display, protocol::wl_surface::WlSurface},
     },
     utils::DeviceFd,
-    wayland::dmabuf::{DmabufFeedbackBuilder, DmabufState},
+    wayland::{
+        dmabuf::{DmabufFeedbackBuilder, DmabufState},
+        presentation::Refresh,
+    },
 };
 use smithay_drm_extras::drm_scanner::{DrmScanEvent, DrmScanner};
 use tracing::{error, info, warn};
+
+mod outputs;
+
+pub use outputs::{gamma_size, heads, reapply_outputs, set_gamma};
 
 use super::Backend;
 use crate::{
     config::{Config, Input as InputConfig},
     render::{
-        PzElement, PzRenderer, mirror_scale, output_elements, post_render, scaled_output_elements,
+        PzElement, PzRenderer, mirror_scale, output_elements, post_render, presentation_feedback,
+        scaled_output_elements,
     },
     state::{RedrawState, State, output_state},
 };
@@ -65,11 +76,17 @@ pub type UdevRenderer<'a> = MultiRenderer<'a, 'a, GpuApi, GpuApi>;
 type OutputManager = DrmOutputManager<
     GbmAllocator<DrmDeviceFd>,
     GbmFramebufferExporter<DrmDeviceFd>,
-    (),
+    FrameFeedback,
     DrmDeviceFd,
 >;
-type DrmOut =
-    DrmOutput<GbmAllocator<DrmDeviceFd>, GbmFramebufferExporter<DrmDeviceFd>, (), DrmDeviceFd>;
+type DrmOut = DrmOutput<
+    GbmAllocator<DrmDeviceFd>,
+    GbmFramebufferExporter<DrmDeviceFd>,
+    FrameFeedback,
+    DrmDeviceFd,
+>;
+/// Presentation feedback travelling with a queued frame (none for mirrors).
+type FrameFeedback = Option<OutputPresentationFeedback>;
 
 /// How long a removed output's global stays disabled before it is destroyed.
 const OUTPUT_GLOBAL_GRACE: Duration = Duration::from_secs(5);
@@ -365,8 +382,8 @@ fn device_added(state: &mut State, node: DrmNode, path: &Path) -> anyhow::Result
 
     let token = state
         .loop_handle
-        .insert_source(notifier, move |event, _, state| match event {
-            DrmEvent::VBlank(crtc) => frame_finished(state, node, crtc),
+        .insert_source(notifier, move |event, metadata, state| match event {
+            DrmEvent::VBlank(crtc) => frame_finished(state, node, crtc, metadata.take()),
             DrmEvent::Error(err) => error!("DRM error: {err}"),
         })
         .map_err(|e| anyhow::anyhow!("drm source: {e}"))?;
@@ -538,7 +555,8 @@ fn connector_connected(
         connector.interface().as_str(),
         connector.interface_id()
     );
-    let output_config = state.config.output(&name).cloned().unwrap_or_default();
+    let output_config = state.output_config(&name);
+    let scale = state.output_scale(&name);
     if output_config.disable {
         info!("output {name} disabled in config");
         return;
@@ -569,7 +587,6 @@ fn connector_connected(
         .mirror
         .clone()
         .filter(|source| source != &name);
-    let scale = state.config.output_scale(&name);
     // A mirror is invisible to clients: no bar, no windows of its own.
     if mirror_of.is_none() {
         let global = output.create_global::<State>(&state.display_handle);
@@ -834,6 +851,11 @@ fn render_inner(state: &mut State, data: &mut UdevData, output: &Output) -> Opti
         Some(Some(source)) => {
             let size = output.current_mode().map(|m| m.size).unwrap_or_default();
             let os = mirror_scale(size, state.output_geometry(&source).size);
+            // Surfaces take their size from the output's scale, not from
+            // `os`: without this the wallpaper stays at 1:1 and leaves bars.
+            if output.current_scale().fractional_scale() != os {
+                output.change_current_state(None, None, Some(Scale::Fractional(os)), None);
+            }
             let own = state
                 .mirror_caches
                 .remove(&output.name())
@@ -852,7 +874,12 @@ fn render_inner(state: &mut State, data: &mut UdevData, output: &Output) -> Opti
             .drm_output
             .render_frame(&mut renderer, &elements, clear, FrameFlags::DEFAULT)
         {
-            Ok(result) => Some(!result.is_empty),
+            Ok(result) if result.is_empty => Some(None),
+            Ok(result) => {
+                Some(Some(state.mirror_source(output).is_none().then(|| {
+                    presentation_feedback(state, output, &result.states)
+                })))
+            }
             Err(err) => {
                 warn!("render on {}: {err}", output.name());
                 None
@@ -863,18 +890,27 @@ fn render_inner(state: &mut State, data: &mut UdevData, output: &Output) -> Opti
         crate::screencopy::process(state, renderer.as_mut(), output);
     }
     match damaged? {
-        true => match surface.drm_output.queue_frame(()) {
+        Some(feedback) => match surface.drm_output.queue_frame(feedback) {
             Ok(()) => Some(true),
             Err(err) => {
                 warn!("queue_frame on {}: {err}", output.name());
+                // The frame never reached the screen, but the damage tracker
+                // counts it as drawn: without a reset, static parts such as
+                // the wallpaper stay missing until something covers them.
+                surface.drm_output.reset_buffers();
                 None
             }
         },
-        false => Some(false),
+        None => Some(false),
     }
 }
 
-fn frame_finished(state: &mut State, node: DrmNode, crtc: crtc::Handle) {
+fn frame_finished(
+    state: &mut State,
+    node: DrmNode,
+    crtc: crtc::Handle,
+    metadata: Option<DrmEventMetadata>,
+) {
     let Backend::Udev(data) = &mut state.backend else {
         return;
     };
@@ -885,10 +921,22 @@ fn frame_finished(state: &mut State, node: DrmNode, crtc: crtc::Handle) {
     else {
         return;
     };
-    if let Err(err) = surface.drm_output.frame_submitted() {
-        warn!("frame_submitted: {err}");
-    }
     let output = surface.output.clone();
+    match surface.drm_output.frame_submitted() {
+        Ok(Some(Some(mut feedback))) => {
+            let (time, flags) = match metadata.map(|m| m.time) {
+                Some(DrmTime::Monotonic(t)) => {
+                    (t.into(), Kind::Vsync | Kind::HwClock | Kind::HwCompletion)
+                }
+                _ => (state.clock.now(), Kind::Vsync),
+            };
+            let refresh = Refresh::fixed(frame_duration(&output));
+            let seq = metadata.map(|m| m.sequence as u64).unwrap_or(0);
+            feedback.presented(time, refresh, seq, flags);
+        }
+        Ok(_) => {}
+        Err(err) => warn!("frame_submitted: {err}"),
+    }
     vblank(state, &output, true);
 }
 

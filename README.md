@@ -49,20 +49,40 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 - Maximize, fullscreen, pin a window to the screen, half-screen tiling by
   dropping a window on a screen edge, magnetic edges.
 - Overview of all windows, and a minimap with live window previews.
+- **Wallpaper parallax** (`[parallax] enabled = true`): the wallpaper
+  drifts slowly left and right and shifts a little against the camera when
+  you pan the canvas.
+- **Find** (`Super+/`): search windows, groups and bookmarks by name and
+  fly there, with rofi, fuzzel or wofi as the picker.
+- **Camera history**: `Super+,` / `Super+.` go back and forward through
+  your jumps (fit, find, overview, bookmark, minimap click), like a browser.
+- **Bookmarks**: remember a view with `Super+Alt+Shift+1…5`, fly back
+  with `Super+Alt+1…5`.
+- **Groups**: windows that belong together get a tinted frame; fit,
+  move and collapse the whole group at once.
+- **Scratchpad**: a drop-down terminal on ``Super+` ``.
+- **Window rules**: open an app on a given workspace, at a given place and
+  size, pinned, maximized, in a group.
 
 **Desktop**
 - 10 workspaces, shown and switched in the DankMaterialShell bar.
 - Desktop profiles: save where your apps are, restore them later; apps
   that are not running are started and put back in place.
 - Several monitors with their own mode, scale and position, or mirroring
-  one monitor onto another.
+  one monitor onto another (a mirror is scaled to fill a TV of another
+  resolution, wallpaper included).
 - Screen sharing and screenshots (wlr-screencopy, xdg-desktop-portal-wlr).
 - X11 apps through xwayland-satellite.
+- Taskbars and docks see and control the windows (foreign-toplevel).
+- Monitor tools work live: kanshi, wdisplays, wlr-randr
+  (wlr-output-management); night light with wlsunset or gammastep.
+- Input methods (fcitx5) and drawing tablets with pressure and tilt.
 
 **Setup**
 - **pzwm config**: a settings app for every option, shortcuts included.
 - Plain TOML config that applies as soon as you save it.
-- `pzwm msg …` controls the running compositor from scripts.
+- `pzwm msg …` controls the running compositor from scripts, with JSON
+  output and an event stream.
 
 ## Install
 
@@ -99,6 +119,7 @@ The script builds in release mode and installs with `sudo` into
 | `/usr/local/bin/pzwm-config` | the settings app |
 | `/usr/local/share/pzwm-config/` | settings app code |
 | `/usr/local/share/applications/pzwm-config.desktop` | **pzwm config** in your app launcher |
+| `/usr/local/share/applications/pzwm-displays.desktop` | **Display Settings** in your app launcher (only under pzwm) |
 | `/usr/share/wayland-sessions/pzwm.desktop` | **pzwm** entry in the login screen |
 | `/usr/local/lib/systemd/user/pzwm-session.target` | starts the bar, portals and other session services |
 | `/usr/local/share/xdg-desktop-portal/pzwm-portals.conf` | which portal handles screen sharing |
@@ -153,6 +174,9 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | `Super+C` | fit the focused window: center it and zoom to fill the screen |
 | `Super+Tab` or `Super+Z` | overview of all windows; again to go back |
 | `Super+M` | minimap at the cursor (tap: stays open, hold: closes on release) |
+| `Super+/` | find a window, group or bookmark |
+| `Super+,` / `Super+.` | camera back / forward |
+| `Super+Alt+Shift+1` … `5` / `Super+Alt+1` … `5` | save bookmark / fly to bookmark |
 
 ### Windows
 
@@ -168,6 +192,17 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | `Super+Q` | close |
 | `Super+Ctrl+arrows` | move the window |
 | `Super+Shift+arrows` | resize the window |
+| ``Super+` `` | scratchpad: call up or put away the drop-down terminal |
+
+### Groups
+
+| Shortcut | Action |
+|---|---|
+| `Super+Ctrl+G` | add the window to a group (the picker asks for its name) |
+| `Super+Alt+G` | take the window out of its group |
+| `Super+G` | collapse / expand the group (a click on a collapsed frame expands it too) |
+| `Super+Shift+G` | fit the whole group on screen |
+| `Super+Alt` + left drag | move the whole group |
 
 ### Focus and workspaces
 
@@ -203,9 +238,10 @@ Open **pzwm config** from your app launcher, or run `pzwm-config`. It edits
 | General | autostart commands, scale, cursor theme and size, X11 apps, title bars |
 | Input | keyboard layouts and options, key repeat, touchpad, pointer speed |
 | Canvas | size of new windows, zoom step and limits, mouse behavior, grid |
-| Monitors | mode, scale, position, mirroring, disabling; lists connected monitors |
+| Monitors | connected monitors with their current mode; mode (picked from what the monitor offers), scale, position, mirroring, disabling |
 | Appearance | gaps, borders, corners, title bars, shadows, colors |
 | Animation | on/off and durations |
+| Parallax | wallpaper drift on/off, strength, swing time, following the camera |
 | Minimap | position, size, colors |
 | Shortcuts | your key bindings and the built-in ones: add, change, turn off, or press *Record* and the keys |
 | Mouse | mouse bindings (`Super+scroll`, `Super+left`, …) |
@@ -238,7 +274,10 @@ the old settings and shows a notification.
 | `[[output]]` | one block per monitor: mode, scale, position, mirror, disable |
 | `[appearance]` | gaps, borders, corners, title bars, shadows, colors (`"#RRGGBB"` or `"#RRGGBBAA"`) |
 | `[animation]` | animations on/off and their length |
+| `[parallax]` | wallpaper parallax: `enabled`, `strength`, `period`, `follow_camera`, see below |
 | `[minimap]` | minimap position, size, colors |
+| `[scratchpad]` | the drop-down window: command, app id, size |
+| `[[rule]]` | window rules, see below |
 | `[binds]` | keyboard shortcuts: `"Mods+Key" = "action"` |
 | `[mouse]` | mouse bindings: `"Mods+Trigger" = "action"` |
 
@@ -281,11 +320,59 @@ triggers: `left`, `right`, `middle`, `back`, `forward`, `scroll`.
 | `workspace <1-10>`, `move-to-workspace <1-10>` | workspaces |
 | `window <1-10>` | the n-th window in the order it was opened |
 | `profile save\|load <name>` | [desktop profiles](#desktop-profiles) |
+| `find` | search windows, groups and bookmarks |
+| `camera back\|forward` | camera history |
+| `bookmark save\|go\|delete <name>` | camera bookmarks (per workspace) |
+| `group add [<name>]\|remove\|toggle [<name>]\|fit [<name>]\|move <dir>` | groups |
+| `scratchpad` | drop-down window |
 | `layout next\|<index>` | keyboard layout |
 | `reload-config`, `quit`, `vt <1-12>` | system |
 
 Mouse actions for `[mouse]`: `zoom`, `pan`, `pan-horizontal` (for
-`scroll`); `pan`, `move-window`, `resize-window` (for buttons).
+`scroll`); `pan`, `move-window`, `resize-window`, `move-group` (for
+buttons).
+
+**Window rules** decide how matching windows open. `app_id` and `title`
+are patterns where `*` matches anything and `?` one character, ignoring
+case; every matching rule applies and later ones win. `pzwm msg windows`
+shows app ids.
+
+```toml
+[[rule]]
+app_id = "pavucontrol"
+size = "700x500"          # logical pixels
+pin = true
+
+[[rule]]
+title = "Picture-in-Picture"
+pin = true
+
+[[rule]]
+app_id = "org.telegram.desktop"
+workspace = 3             # opens there in the background
+position = "0,0"          # canvas coordinates of the window's top-left
+group = "chat"
+```
+
+Options: `workspace`, `position`, `size`, `pin`, `maximize`, `fullscreen`,
+`group`, `scratchpad`.
+
+### Wallpaper parallax
+
+```toml
+[parallax]
+enabled = true
+strength = 0.04       # how far it travels, share of the screen width (0.01 .. 0.15)
+period = 60.0         # seconds for one full swing left, right and back
+follow_camera = true  # also shift against the canvas while panning
+```
+
+The wallpaper (any `background` layer surface: awww, swaybg, hyprpaper…)
+is zoomed in by `strength`, so its edges never show, and sways slowly on
+two mixed sine waves, mostly left and right with a small vertical drift.
+With `follow_camera`, panning the canvas moves it a little the other way,
+like a far-away backdrop. It repaints about 30 times a second only while
+enabled; turning it off in the config stops that at once.
 
 ## Workspaces and the bar
 
@@ -310,6 +397,17 @@ systemctl --user add-wants pzwm-session.target dms.service
 ```
 
 ## Monitors
+
+**Display Settings** in the app launcher (or `pzwm-config --page
+monitors`) opens the Monitors page of pzwm config: it lists the connected
+monitors with their current mode, offers the resolutions and refresh rates
+each monitor supports, and applies the changes as soon as you save.
+
+`nwg-displays` (also called "Displays Settings") does **not** work under
+pzwm: it only talks to sway, Hyprland, niri and Mango through their own
+IPC and quits with "Neither sway, Hyprland, niri nor Mango detected".
+Generic tools that use the wlr-output-management protocol do work:
+wdisplays, wlr-randr, kanshi.
 
 Monitor names (`eDP-1`, `HDMI-A-1`, …) are shown by `pzwm msg outputs`, in
 the log, and on the Monitors page of pzwm config.
@@ -337,8 +435,10 @@ mirror = "eDP-1"
 ```
 
 A mirror has no workspace or bar of its own and is scaled to fit its
-resolution without cropping. Monitor settings apply when the monitor is
-plugged in or pzwm starts; `disable = true` turns a monitor off.
+resolution without cropping. Monitor settings apply as soon as the config
+is saved (mode, scale, position, mirroring, `disable = true` to turn a
+monitor off). Tools such as kanshi or wdisplays change monitors live too;
+their changes last until the next config reload.
 
 ## Desktop profiles
 
@@ -361,6 +461,27 @@ pzwm msg profile list          # list saved profiles
 - Bind them to keys (`"Super+F1" = "profile save work"`), or load one at
   login: `autostart = ["pzwm msg profile load work"]`.
 
+## Groups, bookmarks and find
+
+- A **group** is the windows sharing a name. Each workspace draws a
+  tinted frame around its members, in a color picked from the name.
+  *Collapsing* puts the windows away and leaves only the filled frame;
+  click it (or `Super+G` over it) to bring them back. Groups are saved in
+  desktop profiles.
+- **Bookmarks** remember a camera spot per workspace and survive restarts
+  (`~/.local/state/pzwm/bookmarks.json`). Names are free:
+  `pzwm msg bookmark save inbox`.
+- **Camera history** records where the camera was before every jump, per
+  workspace. Plain panning and zooming are not jumps, but the spot you
+  panned to is remembered when the next jump leaves it.
+- **Find** lists every window (also on other workspaces, minimized or in
+  a collapsed group), every group and every bookmark. pzwm draws no text
+  itself, so the list is shown by a dmenu-style program: `[general]
+  picker`, else rofi, fuzzel or wofi.
+- **Scratchpad**: the first press starts `[scratchpad] command` (foot by
+  default; for ghostty use `ghostty --class=pzwm-scratchpad`). Any window
+  can become it with a `scratchpad = true` rule.
+
 ## Screen sharing and screenshots
 
 - **Screen sharing** (browsers, Discord, OBS): install
@@ -380,13 +501,27 @@ the reply. Any [action](#configuration-file) works as a request.
 | `pzwm msg workspace 3`, `pzwm msg fit`, `pzwm msg spawn foot` … | runs the action, prints `ok` |
 | `pzwm msg windows` | one line per window: id, app, workspace, state, position, size, focus |
 | `pzwm msg outputs` | one line per monitor: name, size, position, scale, workspace, camera |
+| `pzwm msg windows --json`, `outputs --json` | the same as JSON (windows also with title, group, hidden) |
+| `pzwm msg subscribe` | stays connected and prints one JSON event per line (see below) |
 | `pzwm msg profile save\|load\|list …` | see [Desktop profiles](#desktop-profiles) |
+| `pzwm msg bookmark list`, `group list` | bookmarks and groups with their workspace |
+| `pzwm msg heads --json` | every connected monitor (also disabled ones) with the modes it offers |
 | `pzwm reload` | re-read the config |
 | `pzwm --check-config [FILE]` | check the config (or another file) for errors |
 | `pzwm --print-default-config` | print the documented defaults |
 
 A request that fails prints a line starting with `error:` and exits with
 status 1.
+
+**Events** from `pzwm msg subscribe`: first
+`{"event":"state","windows":[…],"outputs":[…]}`, then `window-opened` /
+`window-changed` (with `"window"`), `window-closed` (with `"id"`),
+`focus-changed` (`"id"`, null when nothing is focused) and
+`workspace-changed` (`"output"`, `"workspace"`). Example:
+
+```sh
+pzwm msg subscribe | jq -r 'select(.event=="focus-changed") | .id'
+```
 
 **Environment** set for apps started in pzwm:
 
@@ -411,6 +546,10 @@ other programs:
 | Notifications | mako, swaync |
 | Wallpaper | swaybg, awww |
 | Lock and idle | hyprlock, hypridle, swayidle |
+| Taskbar, dock | waybar `wlr/taskbar`, DankMaterialShell dock |
+| Monitor setup | kanshi, wdisplays, wlr-randr, nwg-displays |
+| Night light | wlsunset, gammastep |
+| Input method | fcitx5 |
 | Screenshots, clipboard | grim, slurp, wl-clipboard, cliphist |
 | X11 apps | [xwayland-satellite](https://github.com/Supreeeme/xwayland-satellite) |
 
@@ -422,7 +561,10 @@ wlr-layer-shell, ext-session-lock, ext-idle-notify, idle-inhibit,
 wlr-screencopy, wlr-data-control, primary selection, xdg-activation,
 fractional-scale, viewporter, linux-dmabuf, presentation-time,
 pointer-constraints, relative-pointer, pointer-gestures, cursor-shape,
-keyboard-shortcuts-inhibit and single-pixel-buffer.
+keyboard-shortcuts-inhibit, single-pixel-buffer, wlr-foreign-toplevel-management,
+ext-foreign-toplevel-list, wlr-output-management, wlr-gamma-control,
+text-input-v3, input-method-v2, virtual-keyboard, tablet-v2, xdg-dialog,
+xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 
 ## Troubleshooting
 
@@ -435,7 +577,13 @@ keyboard-shortcuts-inhibit and single-pixel-buffer.
 | A keyboard layout is missing | XKB allows at most 4 layouts; the 5th in `layouts` is ignored |
 | Screen sharing shows nothing | Install `xdg-desktop-portal-wlr`, then log in again |
 | X11 apps do not start | Install `xwayland-satellite` |
-| New settings for a monitor do nothing | Monitor settings apply when it is plugged in; replug it or log in again |
+| Chrome/Chromium leaves fullscreen video after ~1.5 s | Fixed in pzwm: frames now report presentation feedback (Chromium 151+ quits fullscreen when every frame reads as discarded). Rebuild and log in again |
+| Wallpaper on a mirrored TV leaves bars on the right and bottom | Fixed in pzwm: a mirror now draws surfaces at its own scale. Rebuild and log in again |
+| A monitor change from kanshi/wdisplays is gone | Runtime changes last until the config is reloaded; put them in `[[output]]` to keep them |
+| Displays Settings (nwg-displays) quits at once | It supports only sway, Hyprland, niri and Mango; use **Display Settings** (pzwm config) or wdisplays |
+| `Super+/` does nothing | Install rofi, fuzzel or wofi, or set `[general] picker` |
+| The scratchpad does not open | Its command needs foot by default; set `[scratchpad] command` |
+| Night light does nothing | wlsunset/gammastep need a real session (not `--nested`) |
 
 ## For developers
 
@@ -452,8 +600,14 @@ keyboard-shortcuts-inhibit and single-pixel-buffer.
 | `src/bindings.rs`, `src/action.rs` | key bindings and the action list |
 | `src/config.rs` | config file parsing and defaults |
 | `src/handlers.rs` | Wayland protocol handlers |
+| `src/protocols.rs`, `src/tablet.rs` | input methods, tablets and other small protocols |
+| `src/toplevels.rs` | window lists for taskbars (foreign-toplevel) |
+| `src/output_management.rs`, `src/gamma.rs` | monitor tools and night light |
+| `src/rules.rs`, `src/scratchpad.rs` | window rules, drop-down window |
+| `src/groups.rs`, `src/jumps.rs`, `src/find.rs` | groups, camera history and bookmarks, find |
+| `src/events.rs` | `pzwm msg subscribe` event stream |
 | `src/render/` | drawing: element list per monitor, GLSL shaders |
-| `src/backend/udev.rs` | real session: DRM/KMS monitors, libinput, mirroring |
+| `src/backend/udev.rs`, `src/backend/udev/` | real session: DRM/KMS monitors, libinput, mirroring, live monitor changes, gamma |
 | `src/backend/winit.rs` | `--nested` mode |
 | `src/minimap.rs` | the minimap |
 | `src/profiles.rs` | desktop profiles |

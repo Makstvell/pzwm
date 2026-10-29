@@ -160,6 +160,32 @@ def section_page(store, page: Page) -> Adw.PreferencesPage:
 # ---- monitors --------------------------------------------------------------
 
 
+def mode_text(mode: dict) -> str:
+    """A mode as the config writes it: "2560x1440@165" (refresh rounded to mHz)."""
+    refresh = f"{mode.get('refresh', 0):.3f}".rstrip("0").rstrip(".")
+    return f"{mode['width']}x{mode['height']}@{refresh}"
+
+
+def mode_label(mode: dict) -> str:
+    label = f"{mode['width']} × {mode['height']}  ·  {mode.get('refresh', 0):.2f} Hz"
+    return label + ("  (preferred)" if mode.get("preferred") else "")
+
+
+def head_summary(head: dict) -> str:
+    """One line about a connected monitor: model, current mode, scale."""
+    parts = [p for p in (head.get("make", ""), head.get("model", "")) if p]
+    modes = head.get("modes", [])
+    current = head.get("current_mode")
+    if not head.get("enabled"):
+        parts.append("off")
+    elif isinstance(current, int) and 0 <= current < len(modes):
+        m = modes[current]
+        parts.append(f"{m['width']}×{m['height']} @ {m.get('refresh', 0):.0f} Hz")
+        parts.append(f"scale {head.get('scale', 1):g}")
+        parts.append(f"at {head.get('x', 0)},{head.get('y', 0)}")
+    return "  ·  ".join(dict.fromkeys(parts))
+
+
 class MonitorsPage(Adw.PreferencesPage):
     def __init__(self, store):
         super().__init__(title="Monitors", icon_name="video-display-symbolic")
@@ -171,27 +197,29 @@ class MonitorsPage(Adw.PreferencesPage):
         for g in self.groups:
             self.remove(g)
         self.groups = []
-        connected = self.store.connected_outputs()
+        heads = self.store.heads()
+        self.heads = {h.get("name", ""): h for h in heads}
+        connected = list(self.heads)
         configured = [o.get("name", "") for o in self.store.outputs()]
 
         intro = Adw.PreferencesGroup(
             title="Connected",
-            description="Settings apply when a monitor is plugged in or pzwm starts.",
+            description="Changes apply as soon as you save. "
+            "Monitor tools such as kanshi or wdisplays work too; their changes last until pzwm reloads its config.",
         )
+        buttons = Gtk.Box(spacing=6)
+        buttons.append(_icon_button("view-refresh-symbolic", "Look for monitors again", self.rebuild))
+        buttons.append(_icon_button("list-add-symbolic", "Add a monitor by name", lambda: self._add("")))
+        intro.set_header_suffix(buttons)
         for name in connected:
-            row = _plain_row(name)
+            row = _plain_row(name, head_summary(self.heads[name]))
             if name not in configured:
                 row.add_suffix(
                     _icon_button("list-add-symbolic", "Add settings", lambda n=name: self._add(n))
                 )
-            else:
-                row.set_subtitle("configured below")
             intro.add(row)
         if not connected:
             intro.add(Adw.ActionRow(title="pzwm is not running", subtitle="No monitor list"))
-        intro.set_header_suffix(
-            _icon_button("list-add-symbolic", "Add a monitor by name", lambda: self._add(""))
-        )
         self._push(intro)
 
         # Mirror sources: plugged-in monitors and ones described in the file.
@@ -221,7 +249,11 @@ class MonitorsPage(Adw.PreferencesPage):
             group.add(row)
 
         text_row("name", "Name", "e.g. eDP-1, HDMI-A-1")
-        text_row("mode", "Mode", "e.g. 2560x1440@165; empty: preferred")
+        head = self.heads.get(out.get("name", ""))
+        if head and head.get("modes"):
+            group.add(self._mode_row(index, out, head))
+        else:
+            text_row("mode", "Mode", "e.g. 2560x1440@165; empty: preferred")
         text_row("scale", "Scale", "e.g. 1.5; empty: [general] scale")
         text_row("position", "Position", "x,y in logical pixels; empty: right of the others")
 
@@ -242,6 +274,25 @@ class MonitorsPage(Adw.PreferencesPage):
         off.connect("notify::active", lambda r, _p: self.store.set_output(index, "disable", r.get_active() or None))
         group.add(off)
         return group
+
+    def _mode_row(self, index: int, out: dict, head: dict) -> Adw.ComboRow:
+        """Resolution and refresh rate picked from what the monitor offers."""
+        modes = head["modes"]
+        values = [None, *(mode_text(m) for m in modes)]
+        labels = ["Preferred", *(mode_label(m) for m in modes)]
+        current = out.get("mode")
+        if current and current not in values:
+            # Written by hand (e.g. without the refresh): keep it selectable.
+            values.append(current)
+            labels.append(current)
+        row = Adw.ComboRow(title="Mode", subtitle="Resolution and refresh rate")
+        row.set_model(Gtk.StringList.new(labels))
+        row.set_selected(values.index(current) if current in values else 0)
+        row.connect(
+            "notify::selected",
+            lambda r, _p: self.store.set_output(index, "mode", values[r.get_selected()]),
+        )
+        return row
 
     def _set_text(self, index, key, row):
         text = row.get_text().strip()

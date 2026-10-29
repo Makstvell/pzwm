@@ -6,6 +6,7 @@ the new file with `pzwm --check-config` first, keeps a backup next to it
 and lets pzwm apply it (pzwm reloads its config when the file changes).
 """
 
+import json
 import os
 import shutil
 import subprocess
@@ -76,11 +77,19 @@ class Store:
     def outputs(self) -> list[dict]:
         return self.data().get("output", [])
 
-    def connected_outputs(self) -> list[str]:
-        result = run_pzwm("msg", "outputs")
+    def heads(self) -> list[dict]:
+        """Connected monitors with their modes, from the running pzwm."""
+        result = run_pzwm("msg", "heads", "--json")
         if not result or result.returncode != 0:
             return []
-        return [line.split()[0] for line in result.stdout.splitlines() if line.strip()]
+        try:
+            heads = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return []
+        return heads if isinstance(heads, list) else []
+
+    def connected_outputs(self) -> list[str]:
+        return [h.get("name", "") for h in self.heads() if h.get("name")]
 
     def bindings(self, section: str) -> dict:
         return dict(self.data().get(section, {}))
@@ -230,6 +239,15 @@ class Window(Adw.ApplicationWindow):
         names = [n for n, _ in pages]
         self.sidebar.select_row(self.sidebar.get_row_at_index(names.index(current) if current in names else 0))
 
+    def show_page(self, name: str):
+        """Opens a page by section name (`output` for monitors)."""
+        index = 0
+        while (row := self.sidebar.get_row_at_index(index)) is not None:
+            if row.page_name == name:
+                self.sidebar.select_row(row)
+                return
+            index += 1
+
     def _on_row(self, _list, row):
         if row is not None:
             self.stack.set_visible_child_name(row.page_name)
@@ -290,9 +308,24 @@ class Window(Adw.ApplicationWindow):
         return True
 
 
+# Names `--page` accepts besides the section names.
+PAGE_ALIASES = {"monitors": "output", "displays": "output", "shortcuts": "binds"}
+
+
+def page_from_args(argv: list[str]) -> tuple[str | None, list[str]]:
+    """Takes `--page NAME` out of argv (GTK would reject it)."""
+    if "--page" not in argv:
+        return None, argv
+    i = argv.index("--page")
+    name = argv[i + 1] if i + 1 < len(argv) else None
+    rest = argv[:i] + argv[i + 2 :]
+    return (PAGE_ALIASES.get(name, name) if name else None), rest
+
+
 class App(Adw.Application):
-    def __init__(self):
+    def __init__(self, page: str | None = None):
         super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        self.page = page
 
     def do_activate(self):
         window = self.get_active_window()
@@ -304,6 +337,8 @@ class App(Adw.Application):
                 self._fatal(f"{config_path()}:\n{err}")
                 return
             window = Window(self, store)
+            if self.page:
+                window.show_page(self.page)
         window.present()
 
     def _fatal(self, message: str):
@@ -319,4 +354,5 @@ class App(Adw.Application):
 
 
 if __name__ == "__main__":
-    sys.exit(App().run(sys.argv))
+    start_page, args = page_from_args(sys.argv)
+    sys.exit(App(start_page).run(args))

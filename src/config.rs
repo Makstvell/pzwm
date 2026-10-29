@@ -12,6 +12,7 @@ use tracing::warn;
 use crate::{
     action::Action,
     input::{BTN_BACK, BTN_FORWARD, BTN_LEFT, BTN_MIDDLE, BTN_RIGHT},
+    rules::WindowRule,
 };
 
 pub const DEFAULT_CONFIG: &str = include_str!("../resources/default-config.toml");
@@ -23,10 +24,14 @@ pub struct Config {
     pub input: Input,
     pub canvas: Canvas,
     pub animation: Animation,
+    pub parallax: Parallax,
     pub appearance: Appearance,
     pub minimap: Minimap,
+    pub scratchpad: Scratchpad,
     #[serde(rename = "output")]
     pub outputs: Vec<OutputConfig>,
+    #[serde(rename = "rule")]
+    pub rules: Vec<WindowRule>,
     pub binds: HashMap<String, String>,
     #[serde(skip)]
     pub keybinds: Vec<Keybind>,
@@ -53,6 +58,21 @@ pub struct General {
     pub scale: f64,
     /// Re-read the config as soon as the file is saved.
     pub auto_reload: bool,
+    /// dmenu-style picker for `find` (reads lines, prints the chosen one).
+    /// Empty: rofi, else fuzzel, else wofi.
+    pub picker: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct Scratchpad {
+    /// Started by `scratchpad` when no scratchpad window exists yet.
+    pub command: String,
+    /// Windows with this app id become the scratchpad (rules can add more).
+    pub app_id: String,
+    /// Size as a share (0.1 … 1.0) of the usable screen area.
+    pub width: f64,
+    pub height: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -144,6 +164,20 @@ pub struct Animation {
     pub camera_ms: u64,
 }
 
+/// The wallpaper drifts slowly left and right behind the windows.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct Parallax {
+    pub enabled: bool,
+    /// How far the wallpaper may travel, as a share of the screen width
+    /// (it is zoomed in by as much so no edge ever shows).
+    pub strength: f64,
+    /// Seconds for one full swing left, right and back.
+    pub period: f64,
+    /// Also shift a little against the camera when the canvas is panned.
+    pub follow_camera: bool,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct Appearance {
@@ -211,6 +245,8 @@ pub enum MouseAction {
     Zoom,
     MoveWindow,
     ResizeWindow,
+    /// Drag: move the window's whole group (the window alone without one).
+    MoveGroup,
 }
 
 impl MouseAction {
@@ -221,6 +257,7 @@ impl MouseAction {
             "zoom" => Self::Zoom,
             "move-window" | "move" => Self::MoveWindow,
             "resize-window" | "resize" => Self::ResizeWindow,
+            "move-group" => Self::MoveGroup,
             _ => return None,
         })
     }
@@ -261,9 +298,12 @@ impl Default for Config {
             input: Input::default(),
             canvas: Canvas::default(),
             animation: Animation::default(),
+            parallax: Parallax::default(),
             appearance: Appearance::default(),
             minimap: Minimap::default(),
+            scratchpad: Scratchpad::default(),
             outputs: Vec::new(),
+            rules: Vec::new(),
             binds: HashMap::new(),
             keybinds: Vec::new(),
             mouse: HashMap::new(),
@@ -286,6 +326,18 @@ impl Default for General {
             prefer_server_decorations: true,
             scale: 1.0,
             auto_reload: true,
+            picker: String::new(),
+        }
+    }
+}
+
+impl Default for Scratchpad {
+    fn default() -> Self {
+        Self {
+            command: "foot --app-id pzwm-scratchpad".into(),
+            app_id: "pzwm-scratchpad".into(),
+            width: 0.6,
+            height: 0.5,
         }
     }
 }
@@ -355,6 +407,17 @@ impl Default for Animation {
             enabled: true,
             window_ms: 130,
             camera_ms: 110,
+        }
+    }
+}
+
+impl Default for Parallax {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            strength: 0.04,
+            period: 60.0,
+            follow_camera: true,
         }
     }
 }
@@ -512,6 +575,9 @@ impl Config {
             })
             .collect();
         self.mouse = mouse;
+        for problem in self.rules.iter().flat_map(WindowRule::problems) {
+            warn!("{problem}");
+        }
         self
     }
 

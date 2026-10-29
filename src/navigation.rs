@@ -164,14 +164,14 @@ impl State {
         let mut ids: Vec<u64> = self
             .windows
             .iter()
-            .filter(|m| m.mapped && (m.ws == ws || m.placement == Placement::Pinned))
+            .filter(|m| self.shown(m) && (m.ws == ws || m.placement == Placement::Pinned))
             .map(|m| m.id)
             .collect();
         ids.sort_unstable();
         ids
     }
 
-    fn focus_and_center(&mut self, id: u64) {
+    pub fn focus_and_center(&mut self, id: u64) {
         if let Some(i) = self.index_of_id(id) {
             self.leave_fullscreen_for(i);
             let window = self.windows[i].window.clone();
@@ -279,7 +279,7 @@ impl State {
         let frames: Vec<Rectangle<f64, Logical>> = self
             .windows
             .iter()
-            .filter(|m| m.mapped && m.ws == ws && m.placement == Placement::Canvas)
+            .filter(|m| self.shown(m) && m.ws == ws && m.placement == Placement::Canvas)
             .map(|m| self.canvas_frame(m))
             .collect();
         let Some(bbox) = bounding_box(&frames) else {
@@ -332,7 +332,7 @@ impl State {
         let next = self
             .windows
             .iter()
-            .find(|m| m.mapped && m.ws == ws && m.placement != Placement::Pinned)
+            .find(|m| self.shown(m) && m.ws == ws && m.placement != Placement::Pinned)
             .map(|m| m.window.clone());
         self.focus_window(next);
         self.queue_redraw_all();
@@ -353,7 +353,7 @@ impl State {
             let next = self
                 .windows
                 .iter()
-                .find(|m| m.mapped && m.ws == current && m.window != window)
+                .find(|m| self.shown(m) && m.ws == current && m.window != window)
                 .map(|m| m.window.clone());
             self.focus_window(next);
         }

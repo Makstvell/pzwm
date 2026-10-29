@@ -10,7 +10,7 @@ pub enum Dir {
 }
 
 impl Dir {
-    fn parse(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "left" | "l" => Some(Self::Left),
             "right" | "r" => Some(Self::Right),
@@ -44,6 +44,17 @@ pub enum Action {
     CenterWindow,
     /// `profile save|load NAME`: desktop profiles, see profiles.rs.
     Profile(String),
+    /// `bookmark save|go|delete NAME`: camera spots, see jumps.rs.
+    Bookmark(String),
+    /// `group add NAME | remove | fit | toggle | move DIR`, see groups.rs.
+    Group(String),
+    /// Back / forward through the camera's jumps.
+    CameraBack,
+    CameraForward,
+    /// Call up or put away the drop-down scratchpad window.
+    Scratchpad,
+    /// Search windows, groups and bookmarks with a picker.
+    Find,
     /// Center the window and zoom so it fills the visible area.
     FitWindow,
     FocusDir(Dir),
@@ -91,6 +102,17 @@ impl Action {
             "center" | "center-window" => Self::CenterWindow,
             "fit" | "fit-window" => Self::FitWindow,
             "profile" if !arg.is_empty() => Self::Profile(arg.to_string()),
+            "bookmark" if !arg.is_empty() => Self::Bookmark(arg.to_string()),
+            "group" if !arg.is_empty() => Self::Group(arg.to_string()),
+            "camera" => match arg {
+                "back" => Self::CameraBack,
+                "forward" => Self::CameraForward,
+                _ => return None,
+            },
+            "jump-back" => Self::CameraBack,
+            "jump-forward" => Self::CameraForward,
+            "scratchpad" | "toggle-scratchpad" => Self::Scratchpad,
+            "find" | "search" => Self::Find,
             "focus" => match arg {
                 "next" => Self::FocusNext,
                 "prev" | "previous" => Self::FocusPrev,
@@ -144,6 +166,18 @@ mod tests {
         assert_eq!(Action::parse("focus next"), Some(Action::FocusNext));
         assert_eq!(Action::parse("layout 3"), Some(Action::SetLayout(3)));
         assert_eq!(Action::parse("vt 2"), Some(Action::SwitchVt(2)));
+        assert_eq!(
+            Action::parse("bookmark save 1"),
+            Some(Action::Bookmark("save 1".into()))
+        );
+        assert_eq!(
+            Action::parse("group add work"),
+            Some(Action::Group("add work".into()))
+        );
+        assert_eq!(Action::parse("camera back"), Some(Action::CameraBack));
+        assert_eq!(Action::parse("jump-forward"), Some(Action::CameraForward));
+        assert_eq!(Action::parse("scratchpad"), Some(Action::Scratchpad));
+        assert_eq!(Action::parse("find"), Some(Action::Find));
     }
 
     #[test]
@@ -153,5 +187,8 @@ mod tests {
         assert_eq!(Action::parse("workspace 11"), None);
         assert_eq!(Action::parse("pan sideways"), None);
         assert_eq!(Action::parse("dance"), None);
+        assert_eq!(Action::parse("camera sideways"), None);
+        assert_eq!(Action::parse("bookmark"), None);
+        assert_eq!(Action::parse("group"), None);
     }
 }

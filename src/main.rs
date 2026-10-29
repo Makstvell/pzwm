@@ -7,24 +7,39 @@ mod bindings;
 mod canvas;
 mod config;
 mod cursor;
+mod events;
+mod find;
+mod gamma;
 mod grabs;
+mod groups;
 mod handlers;
 mod input;
 mod ipc;
+mod jumps;
 mod minimap;
 mod navigation;
+mod output_management;
 mod profiles;
+mod protocols;
 mod render;
+mod rules;
+mod scratchpad;
 mod screencopy;
 mod shell;
 mod state;
+mod tablet;
+mod toplevels;
 
 use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::Duration,
 };
 
-use smithay::reexports::calloop::EventLoop;
+use smithay::reexports::calloop::{
+    EventLoop,
+    timer::{TimeoutAction, Timer},
+};
 use tracing::{info, warn};
 
 use crate::{config::Config, state::State};
@@ -37,6 +52,8 @@ USAGE: pzwm [OPTIONS]
                             (it also reloads by itself when the file is saved)
        pzwm msg <request>   talk to a running pzwm, e.g.
                             pzwm msg workspace 2 | zoom-in | overview | windows | outputs
+                            pzwm msg windows --json | outputs --json
+                            pzwm msg subscribe   stream JSON events, one per line
 
 OPTIONS:
   --nested          run in a window inside the current compositor
@@ -82,6 +99,13 @@ fn main() {
         Some("reload") => Some("reload".to_string()),
         _ => None,
     };
+    if request.as_deref().map(str::trim) == Some("subscribe") {
+        if let Err(err) = ipc::subscribe() {
+            eprintln!("pzwm: {err:#}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if let Some(request) = request {
         match ipc::send(&request) {
             Ok(reply) => {
@@ -131,10 +155,19 @@ fn check_config(file: Option<PathBuf>) -> i32 {
     };
     match Config::parse(&text) {
         Ok(cfg) => {
+            let problems: Vec<String> = cfg
+                .rules
+                .iter()
+                .flat_map(rules::WindowRule::problems)
+                .collect();
+            for problem in &problems {
+                println!("{}: warning: {problem}", path.display());
+            }
             println!(
-                "{}: OK, {} key bindings",
+                "{}: OK, {} key bindings, {} window rules",
                 path.display(),
-                cfg.keybinds.len()
+                cfg.keybinds.len(),
+                cfg.rules.len()
             );
             0
         }
@@ -176,6 +209,7 @@ fn run(nested: bool) -> anyhow::Result<()> {
     if state.config.general.xwayland {
         start_xwayland_satellite(&mut state);
     }
+    start_parallax_tick(&mut state);
     let real_session = !nested && state.config.general.systemd_session;
     if real_session {
         start_systemd_session(&state);
@@ -201,6 +235,9 @@ fn run(nested: bool) -> anyhow::Result<()> {
     event_loop.run(None, &mut state, |state| {
         state.popups.cleanup();
         state.bar_publish();
+        state.events_publish();
+        state.toplevels_refresh();
+        state.output_management_refresh();
         if let Err(err) = state.display_handle.flush_clients() {
             warn!("flush_clients: {err}");
         }
@@ -218,6 +255,26 @@ fn run(nested: bool) -> anyhow::Result<()> {
     let _ = std::fs::remove_file(&ipc_path);
     let _ = std::fs::remove_file(&bar_path);
     Ok(())
+}
+
+/// How often a drifting wallpaper is repainted. It moves a few pixels per
+/// second, so this is smooth without waking up on every vblank.
+const PARALLAX_TICK: Duration = Duration::from_millis(33);
+
+/// Repaints the outputs while wallpaper parallax is on (read on every tick,
+/// so toggling it in the config takes effect without a restart).
+fn start_parallax_tick(state: &mut State) {
+    let tick = state
+        .loop_handle
+        .insert_source(Timer::immediate(), |_, _, state| {
+            if state.config.parallax.enabled {
+                state.queue_redraw_all();
+            }
+            TimeoutAction::ToDuration(PARALLAX_TICK)
+        });
+    if let Err(err) = tick {
+        warn!("parallax timer: {err}");
+    }
 }
 
 /// X11 apps through xwayland-satellite, when it is installed.

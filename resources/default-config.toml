@@ -27,6 +27,9 @@ scale = 1.0
 # Apply changes as soon as config.toml is saved (also: `pzwm reload`).
 # A file with an error is not applied: you get a notification instead.
 auto_reload = true
+# dmenu-style picker used by `find` and `group add`: reads lines on stdin,
+# prints the chosen one. Empty: rofi, else fuzzel, else wofi.
+picker = ""
 
 [input]
 layouts = "us"          # e.g. "us,ua,de"
@@ -79,10 +82,47 @@ window_color = "#4b5263"
 focused_color = "#22d3ee"
 viewport_color = "#8b5cf6"
 
+# Drop-down window called up and put away by `scratchpad` (Super+`).
+[scratchpad]
+# Started on first use when no scratchpad window exists.
+command = "foot --app-id pzwm-scratchpad"
+# Windows with this app id become the scratchpad.
+app_id = "pzwm-scratchpad"
+width = 0.6     # share of the screen, 0.1 … 1.0
+height = 0.5
+
+# Window rules: how matching windows open. app_id and title are patterns
+# where * matches anything and ? one character (case does not matter).
+# Every matching rule applies, later ones win. Options: workspace (1 … 10),
+# position ("x,y" on the canvas), size ("WxH"), pin, maximize, fullscreen,
+# group (name), scratchpad.
+#
+# [[rule]]
+# app_id = "pavucontrol"
+# size = "700x500"
+# pin = true
+#
+# [[rule]]
+# title = "Picture-in-Picture"
+# pin = true
+#
+# [[rule]]
+# app_id = "org.telegram.desktop"
+# workspace = 3
+# group = "chat"
+
 [animation]
 enabled = true
 window_ms = 130         # open / close / maximize
 camera_ms = 110         # zoom / overview / center; short on purpose, no inertia
+
+# Wallpaper parallax: the background drifts slowly left and right and
+# shifts a little against the camera while the canvas is panned.
+[parallax]
+enabled = false
+strength = 0.04          # travel, share of the screen width (0.01 .. 0.15)
+period = 60.0            # seconds for one full swing
+follow_camera = true
 
 [appearance]
 gaps = 10
@@ -140,7 +180,8 @@ pinned_accent = "#f59e0b"
 # window slides under the cursor, until you pause.
 # Mouse binds work anywhere, also over windows: "Mods+Trigger" = "action".
 # Triggers: left, right, middle, back, forward, scroll.
-# Drag actions: pan, move-window, resize-window.
+# Drag actions: pan, move-window, resize-window, move-group (the window's
+# whole group; a window without a group moves alone).
 # Scroll actions: zoom (wheel zooms, touchpad pans), pan, pan-horizontal.
 # Set a bind to "none" to remove it.
 [mouse]
@@ -151,6 +192,7 @@ pinned_accent = "#f59e0b"
 "Super+middle" = "pan"
 "Super+Shift+left" = "move-window"
 "Super+right" = "resize-window"
+"Super+Alt+left" = "move-group"
 
 [binds]
 "Super+Return" = "spawn ${TERMINAL:-foot}"
@@ -226,6 +268,31 @@ pinned_accent = "#f59e0b"
 "Super+Shift+0" = "move-to-workspace 10"
 
 "Super+Shift+space" = "layout next"
+
+# Camera history, like a browser's back and forward: every jump (fit, find,
+# overview, bookmark, minimap click) can be undone.
+"Super+comma" = "camera back"
+"Super+period" = "camera forward"
+# Bookmarks: Super+Alt+Shift+N remembers the view, Super+Alt+N flies back.
+"Super+Alt+1" = "bookmark go 1"
+"Super+Alt+2" = "bookmark go 2"
+"Super+Alt+3" = "bookmark go 3"
+"Super+Alt+4" = "bookmark go 4"
+"Super+Alt+5" = "bookmark go 5"
+"Super+Alt+Shift+1" = "bookmark save 1"
+"Super+Alt+Shift+2" = "bookmark save 2"
+"Super+Alt+Shift+3" = "bookmark save 3"
+"Super+Alt+Shift+4" = "bookmark save 4"
+"Super+Alt+Shift+5" = "bookmark save 5"
+# Search windows, groups and bookmarks.
+"Super+slash" = "find"
+# Drop-down terminal.
+"Super+grave" = "scratchpad"
+# Groups: join (asks for a name), leave, collapse/expand, fit on screen.
+"Super+Ctrl+G" = "group add"
+"Super+Alt+G" = "group remove"
+"Super+G" = "group toggle"
+"Super+Shift+G" = "group fit"
 
 "Print" = "spawn mkdir -p ~/Pictures/Screenshots && grim ~/Pictures/Screenshots/$(date +%Y-%m-%d_%H-%M-%S).png"
 "Super+Shift+S" = "spawn grim -g \"$(slurp)\" - | wl-copy"

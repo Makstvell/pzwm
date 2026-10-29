@@ -41,6 +41,7 @@ PAGES = (
             Option("prefer_server_decorations", "pzwm draws title bars", "bool", "Apps that refuse keep their own"),
             Option("systemd_session", "Start the systemd session", "bool", "Brings up the bar and portals"),
             Option("auto_reload", "Apply changes on save", "bool"),
+            Option("picker", "Picker", "str", "dmenu-style program for Find and new groups; empty: rofi, fuzzel or wofi"),
         ),
     ),
     Page(
@@ -110,6 +111,17 @@ PAGES = (
         ),
     ),
     Page(
+        "scratchpad",
+        "Scratchpad",
+        "utilities-terminal-symbolic",
+        (
+            Option("command", "Command", "str", "Started by the scratchpad key when it is not running"),
+            Option("app_id", "App id", "str", "Windows with this app id become the scratchpad"),
+            Option("width", "Width", "float", "Share of the screen", 0.1, 1, 0.05),
+            Option("height", "Height", "float", "Share of the screen", 0.1, 1, 0.05),
+        ),
+    ),
+    Page(
         "animation",
         "Animation",
         "media-playback-start-symbolic",
@@ -117,6 +129,17 @@ PAGES = (
             Option("enabled", "Animations", "bool"),
             Option("window_ms", "Window animations", "int", "Open, close, maximize (ms)", 0, 1000, 10),
             Option("camera_ms", "Camera animations", "int", "Zoom, overview, center (ms)", 0, 1000, 10),
+        ),
+    ),
+    Page(
+        "parallax",
+        "Parallax",
+        "preferences-desktop-wallpaper-symbolic",
+        (
+            Option("enabled", "Wallpaper parallax", "bool", "The background drifts slowly left and right"),
+            Option("strength", "Strength", "float", "Travel, share of the screen width", 0.01, 0.15, 0.01),
+            Option("period", "Swing time", "float", "Seconds for one full swing", 10, 300, 5),
+            Option("follow_camera", "Follow the camera", "bool", "Shift against the canvas while panning"),
         ),
     ),
     Page(
@@ -168,10 +191,20 @@ KEY_ACTIONS = (
     "layout next",
     "profile save work",
     "profile load work",
+    "find",
+    "scratchpad",
+    "camera back",
+    "camera forward",
+    "bookmark save 1",
+    "bookmark go 1",
+    "group add",
+    "group remove",
+    "group toggle",
+    "group fit",
     "reload-config",
     "none",
 )
 
-MOUSE_ACTIONS = ("zoom", "pan", "pan-horizontal", "move-window", "resize-window", "none")
+MOUSE_ACTIONS = ("zoom", "pan", "pan-horizontal", "move-window", "resize-window", "move-group", "none")
 
 OUTPUT_KEYS = ("name", "mode", "scale", "position", "mirror", "disable")

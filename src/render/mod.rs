@@ -1,8 +1,10 @@
 //! Builds the element list for one output, front to back:
 //! cursor → lock screen → overlay layer → fullscreen → bar (top layer) →
-//! minimap → snap preview → windows with their frames → canvas grid → bottom and
-//! background layers (the wallpaper).
+//! minimap → snap preview → windows with their frames → group frames →
+//! canvas grid → bottom and background layers (the wallpaper).
 
+mod group_frames;
+mod parallax;
 pub mod shaders;
 
 use std::{
@@ -14,7 +16,7 @@ use smithay::{
     backend::renderer::{
         ImportAll, ImportMem, Renderer, RendererSuper, Texture,
         element::{
-            AsRenderElements, Element, Id, Kind,
+            AsRenderElements, Element, Id, Kind, RenderElementStates,
             memory::MemoryRenderBufferRenderElement,
             render_elements,
             surface::{
@@ -26,7 +28,13 @@ use smithay::{
         gles::{GlesError, GlesFrame, GlesRenderer},
     },
     desktop::{
-        PopupManager, layer_map_for_output, space::SpaceElement, utils::send_frames_surface_tree,
+        PopupManager, layer_map_for_output,
+        space::SpaceElement,
+        utils::{
+            OutputPresentationFeedback, send_frames_surface_tree,
+            surface_presentation_feedback_flags_from_states,
+            take_presentation_feedback_surface_tree,
+        },
     },
     input::pointer::{CursorImageStatus, CursorImageSurfaceData},
     output::Output,
@@ -94,6 +102,8 @@ pub struct RenderCache {
     /// Ids of minimap previews, by output and the surface element they copy.
     thumbs: HashMap<(String, Id), Id>,
     preview: ShaderElement,
+    /// Group frames by output and group name.
+    groups: HashMap<(String, String), ShaderElement>,
 }
 
 impl RenderCache {
@@ -213,13 +223,18 @@ pub fn scaled_output_elements<R: PzRenderer>(
     }
 
     if let Some(sh) = shaders.as_ref() {
+        group_frames::group_elements(state, output, os, sh, &mut out);
         if let Some(grid) = grid_element(state, output, os, sh) {
             out.push(PzElement::Shader(grid));
         }
     }
 
     layer_elements(renderer, output, Layer::Bottom, os, &mut out);
-    layer_elements(renderer, output, Layer::Background, os, &mut out);
+    if state.config.parallax.enabled {
+        parallax::background_elements(state, renderer, output, os, &mut out);
+    } else {
+        layer_elements(renderer, output, Layer::Background, os, &mut out);
+    }
     (out, state.config.appearance.background)
 }
 
@@ -723,6 +738,35 @@ pub fn post_render(state: &mut State, output: &Output) {
             Some(output.clone())
         });
     }
+}
+
+/// Presentation feedback of everything drawn in a frame on `output`, to be
+/// marked presented once the frame reaches the screen. Without it every frame
+/// reads as discarded, and Chromium leaves fullscreen after ~1.5 s.
+pub fn presentation_feedback(
+    state: &State,
+    output: &Output,
+    states: &RenderElementStates,
+) -> OutputPresentationFeedback {
+    let mut feedback = OutputPresentationFeedback::new(output);
+    let primary = |_: &_, _: &_| Some(output.clone());
+    let flags =
+        |surface: &_, _: &_| surface_presentation_feedback_flags_from_states(surface, states);
+    for m in state
+        .windows
+        .iter()
+        .filter(|m| state.view(m, output).is_some())
+    {
+        m.window
+            .take_presentation_feedback(&mut feedback, primary, flags);
+    }
+    for layer in layer_map_for_output(output).layers() {
+        layer.take_presentation_feedback(&mut feedback, primary, flags);
+    }
+    if let Some(lock) = state.lock_surfaces.get(&output.name()) {
+        take_presentation_feedback_surface_tree(lock.wl_surface(), &mut feedback, primary, flags);
+    }
+    feedback
 }
 
 #[cfg(test)]

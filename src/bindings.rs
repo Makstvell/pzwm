@@ -118,24 +118,46 @@ impl State {
             Action::ToggleMaximize => focused.into_iter().for_each(|i| self.toggle_maximize(i)),
             Action::ToggleFullscreen => focused.into_iter().for_each(|i| self.toggle_fullscreen(i)),
             Action::TogglePin => focused.into_iter().for_each(|i| self.toggle_pin(i)),
-            Action::CenterWindow => focused.into_iter().for_each(|i| self.center_on(i)),
-            Action::FitWindow => focused.into_iter().for_each(|i| self.fit_window(i)),
+            Action::CenterWindow => focused.into_iter().for_each(|i| {
+                self.remember_camera_of_ws(self.windows[i].ws);
+                self.center_on(i)
+            }),
+            Action::FitWindow => focused.into_iter().for_each(|i| {
+                self.remember_camera_of_ws(self.windows[i].ws);
+                self.fit_window(i)
+            }),
             Action::Profile(args) => {
                 let args: Vec<&str> = args.split_whitespace().collect();
-                let (title, body) = match self.profile_command(&args) {
-                    Ok(msg) => ("pzwm", msg),
-                    Err(err) => ("pzwm: profile error", err),
-                };
-                self.spawn(&format!(
-                    "notify-send -a pzwm {} {}",
-                    shell_quote(title),
-                    shell_quote(&body)
-                ));
+                let result = self.profile_command(&args);
+                self.notify_result("profile", result, true);
             }
+            Action::Bookmark(args) => {
+                let args: Vec<&str> = args.split_whitespace().collect();
+                let result = self.bookmark_command(&args);
+                // Saving gets a confirmation; jumping speaks for itself.
+                self.notify_result("bookmark", result, args.first() != Some(&"go"));
+            }
+            Action::Group(args) => {
+                let args: Vec<&str> = args.split_whitespace().collect();
+                let result = self.group_command(&args);
+                self.notify_result("group", result, args.first() == Some(&"add"));
+            }
+            Action::CameraBack | Action::CameraForward => {
+                if let Some(o) = output {
+                    self.camera_history(&o, action == Action::CameraBack);
+                }
+            }
+            Action::Scratchpad => self.toggle_scratchpad(),
+            Action::Find => self.find(),
             Action::FocusDir(dir) => self.focus_dir(dir),
             Action::FocusNext => self.focus_cycle(true),
             Action::FocusPrev => self.focus_cycle(false),
-            Action::FocusNth(n) => self.focus_nth(n),
+            Action::FocusNth(n) => {
+                if let Some(o) = &output {
+                    self.remember_camera(o);
+                }
+                self.focus_nth(n)
+            }
             Action::MoveWindow(dir) => {
                 if let Some(i) = focused {
                     let (dx, dy) = dir.vector();
@@ -181,9 +203,18 @@ impl State {
                     self.zoom_at(&o, center, factor, true);
                 }
             }
-            Action::ZoomReset => output.into_iter().for_each(|o| self.zoom_reset(&o)),
-            Action::Overview => output.into_iter().for_each(|o| self.overview(&o)),
-            Action::Home => output.into_iter().for_each(|o| self.home(&o)),
+            Action::ZoomReset => output.into_iter().for_each(|o| {
+                self.remember_camera(&o);
+                self.zoom_reset(&o)
+            }),
+            Action::Overview => output.into_iter().for_each(|o| {
+                self.remember_camera(&o);
+                self.overview(&o)
+            }),
+            Action::Home => output.into_iter().for_each(|o| {
+                self.remember_camera(&o);
+                self.home(&o)
+            }),
             Action::ToggleMinimap => self.toggle_minimap(),
             Action::Workspace(ws) => self.switch_workspace(ws),
             Action::MoveToWorkspace(ws) => focused
@@ -209,6 +240,21 @@ impl State {
             Action::SwitchVt(vt) => crate::backend::switch_vt(self, vt),
         }
         self.update_pointer_focus();
+    }
+
+    /// Shows the outcome of a keyboard command as a notification: errors
+    /// always, success only when `confirm` is set.
+    fn notify_result(&mut self, what: &str, result: Result<String, String>, confirm: bool) {
+        let (title, body) = match result {
+            Ok(msg) if confirm => ("pzwm".to_string(), msg),
+            Ok(_) => return,
+            Err(err) => (format!("pzwm: {what} error"), err),
+        };
+        self.spawn(&format!(
+            "notify-send -a pzwm {} {}",
+            shell_quote(&title),
+            shell_quote(&body)
+        ));
     }
 
     /// Applies the config file to the running session. A file that does not
@@ -245,7 +291,9 @@ impl State {
         );
         self.config = config;
         crate::backend::reconfigure_input(self);
-        self.apply_output_scales();
+        // The file is the truth again: runtime monitor changes are dropped.
+        self.output_overrides.clear();
+        crate::backend::reapply_outputs(self);
         self.queue_redraw_all();
         info!("config reloaded");
         Ok(())
@@ -281,16 +329,12 @@ impl State {
 
     /// Applies changed `scale` / `position` settings to running outputs and
     /// tells clients their new preferred scale.
-    fn apply_output_scales(&mut self) {
+    pub(crate) fn apply_output_scales(&mut self) {
         let mut changed = false;
         for output in self.outputs.clone() {
             let name = output.name();
-            let scale = self.config.output_scale(&name);
-            let position = self
-                .config
-                .output(&name)
-                .and_then(|o| o.position())
-                .map(Point::from);
+            let scale = self.output_scale(&name);
+            let position = self.output_config(&name).position().map(Point::from);
             let scale_changed = (output.current_scale().fractional_scale() - scale).abs() > 1e-6;
             let moved = position.is_some_and(|p| p != output.current_location());
             if !scale_changed && !moved {
@@ -337,7 +381,7 @@ impl State {
 }
 
 /// Quotes `s` as one `sh` word.
-fn shell_quote(s: &str) -> String {
+pub fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 

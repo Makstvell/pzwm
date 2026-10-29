@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Display Settings
+GenericName=Monitor configuration
+Comment=Resolution, refresh rate, scale, position and mirroring of your monitors under pzwm
+Exec=pzwm-config --page monitors
+Icon=preferences-desktop-display
+Terminal=false
+Categories=Settings;HardwareSettings;GTK;
+Keywords=display;monitor;screen;resolution;refresh;scale;mirror;pzwm;
+OnlyShowIn=pzwm;
+StartupNotify=true

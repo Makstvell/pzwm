@@ -201,6 +201,15 @@ pub struct State {
     pub render_cursor: bool,
     pub pending_copies: Vec<crate::screencopy::PendingCopy>,
     pub bar: crate::bar::BarFeed,
+    pub events: crate::events::EventFeed,
+    /// Window lists for taskbars (foreign-toplevel protocols).
+    pub toplevels: crate::toplevels::Toplevels,
+    pub protocols: crate::protocols::Protocols,
+    /// Monitor settings applied at runtime (wlr-output-management, e.g.
+    /// kanshi or wdisplays); they win over `[[output]]` until a reload.
+    pub output_overrides: Vec<crate::config::OutputConfig>,
+    pub gamma: crate::gamma::GammaControls,
+    pub output_management: crate::output_management::OutputManagement,
     /// Outputs showing a copy of another output (`mirror` in the config).
     /// They are not in `outputs`: no workspace, bar or cursor of their own.
     pub mirrors: Vec<Mirror>,
@@ -208,6 +217,12 @@ pub struct State {
     /// scale does not make its cached elements look changed on every frame.
     pub mirror_caches: HashMap<String, RenderCache>,
     pub profile_pending: crate::profiles::PendingPlacements,
+    /// Camera history and bookmarks.
+    pub jumps: crate::jumps::Jumps,
+    /// Groups whose windows are put away, only their frame showing.
+    pub collapsed_groups: std::collections::HashSet<String>,
+    /// When `scratchpad` last started its app, so a double press starts one.
+    pub scratchpad_spawned: Option<Instant>,
     pub xwayland_display: Option<String>,
     pub children: Vec<std::process::Child>,
 }
@@ -280,6 +295,10 @@ impl State {
         let cursor_shape_state = CursorShapeManagerState::new::<Self>(&dh);
         let single_pixel_buffer_state = SinglePixelBufferState::new::<Self>(&dh);
         crate::screencopy::init(&dh);
+        let toplevels = crate::toplevels::Toplevels::new(&dh);
+        let protocols = crate::protocols::Protocols::new(&dh);
+        crate::gamma::init(&dh);
+        crate::output_management::init(&dh);
 
         let mut seat = seat_state.new_wl_seat(&dh, backend.seat_name());
         let pointer = seat.add_pointer();
@@ -366,15 +385,44 @@ impl State {
             render_cursor: true,
             pending_copies: Vec::new(),
             bar: Default::default(),
+            events: Default::default(),
+            toplevels,
+            protocols,
+            output_overrides: Vec::new(),
+            gamma: Default::default(),
+            output_management: Default::default(),
             mirrors: Vec::new(),
             mirror_caches: HashMap::new(),
             profile_pending: Default::default(),
+            jumps: crate::jumps::Jumps::load(),
+            collapsed_groups: Default::default(),
+            scratchpad_spawned: None,
             xwayland_display: None,
             children: Vec::new(),
         })
     }
 
     // ---- outputs & workspaces ----------------------------------------------
+
+    /// Settings for a monitor: a runtime override, else `[[output]]`.
+    pub fn output_config(&self, name: &str) -> crate::config::OutputConfig {
+        self.output_overrides
+            .iter()
+            .find(|o| o.name == name)
+            .or_else(|| self.config.output(name))
+            .cloned()
+            .unwrap_or_else(|| crate::config::OutputConfig {
+                name: name.to_string(),
+                ..Default::default()
+            })
+    }
+
+    pub fn output_scale(&self, name: &str) -> f64 {
+        self.output_config(name)
+            .scale
+            .unwrap_or(self.config.general.scale)
+            .clamp(0.5, 4.0)
+    }
 
     pub fn output_geometry(&self, output: &Output) -> Rectangle<i32, Logical> {
         let loc = output.current_location();
@@ -423,7 +471,7 @@ impl State {
         }
     }
 
-    fn camera_slot(&self, ws: usize) -> usize {
+    pub fn camera_slot(&self, ws: usize) -> usize {
         if self.config.canvas.per_workspace_camera {
             ws
         } else {
