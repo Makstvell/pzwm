@@ -559,8 +559,12 @@ impl State {
             target.loc.y + (target.size.h - size.h - title) / 2.0 + title,
         ));
         let area = m.area;
+        // A window right after a user's launch is theirs: it asks for its
+        // place like any new one, even of an app that is already open.
+        let user_launched =
+            parent_frame.is_none() && !self.is_dialog_like(idx) && self.take_user_launch();
         let sibling = match (parent_frame, area) {
-            (None, None) => self.sibling_spot(idx, ws),
+            (None, None) if !user_launched => self.sibling_spot(idx, ws),
             _ => None,
         };
         if let Some((_, rect)) = area {
@@ -622,8 +626,9 @@ impl State {
                 if (m.size().h - content.h as f64).abs() > 1.0 {
                     self.configure(idx, Some(content), false, false);
                 }
-            } else if sibling.is_some() && !ruled && !from_profile {
-                self.reveal(idx);
+            } else if (sibling.is_some() || parent_frame.is_some()) && !ruled && !from_profile {
+                // A child window: show it, at most at 100 % so it stays sharp.
+                self.fit_window_at_most(idx, 1.0);
             }
         }
         self.queue_redraw_all();

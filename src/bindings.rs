@@ -141,7 +141,10 @@ impl State {
         let output = self.active_output();
         let step = self.config.canvas.window_step;
         match action {
-            Action::Spawn(cmd) => self.spawn(&cmd),
+            Action::Spawn(cmd) => {
+                self.note_user_launch();
+                self.spawn(&cmd)
+            }
             Action::Close => self.close_focused(),
             Action::ToggleMaximize => focused.into_iter().for_each(|i| self.toggle_maximize(i)),
             Action::ToggleFullscreen => focused.into_iter().for_each(|i| self.toggle_fullscreen(i)),
@@ -185,6 +188,11 @@ impl State {
             Action::Area(args) => {
                 let result = self.area_command(&args);
                 self.notify_result("area", result, false);
+            }
+            Action::IdealSize => {
+                if let Some(i) = focused {
+                    self.ideal_size(i);
+                }
             }
             Action::Tile(args) => {
                 let result = self.tile_command(&args);

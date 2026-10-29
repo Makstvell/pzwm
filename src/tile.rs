@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use smithay::{
     input::pointer::CursorIcon,
     output::Output,
-    utils::{Logical, Point, Rectangle},
+    utils::{Logical, Point, Rectangle, Size},
 };
 
 use crate::{action::Dir, shell::Placement, state::State};
@@ -21,6 +21,8 @@ pub const SNAP_SHARES: [f64; 3] = [0.5, 1.0 / 3.0, 2.0 / 3.0];
 const SNAP_REPEAT: Duration = Duration::from_secs(3);
 /// The largest grid `[canvas] tile_grid` may ask for.
 pub const MAX_GRID: u32 = 12;
+/// A window this close to the size `ideal-size` gave it still counts as at it.
+const IDEAL_SLACK: i32 = 32;
 /// Grid used when `[canvas] tile_grid` is not valid.
 const DEFAULT_GRID: (u32, u32) = (6, 4);
 
@@ -28,6 +30,16 @@ const DEFAULT_GRID: (u32, u32) = (6, 4);
 pub struct Cell {
     pub col: u32,
     pub row: u32,
+}
+
+/// Where a window was before `ideal-size`, to go back on the next press.
+#[derive(Clone, Copy)]
+pub struct IdealRestore {
+    pub pos: Point<f64, Logical>,
+    pub ws: usize,
+    pub size: Size<i32, Logical>,
+    /// The size `ideal-size` asked for.
+    pub applied: Size<i32, Logical>,
 }
 
 /// The grid's cells and the selected block, screen units.
@@ -279,6 +291,74 @@ impl State {
             .map(|cell| cells_rect(area, gap, grid, cell))
             .collect();
         Some((cells, cells_rect(area, gap, grid, span(t.anchor, t.end))))
+    }
+
+    /// `ideal-size` (Super+Shift+F): the window takes the whole usable
+    /// screen (the bar left out) at 100 %, placed by `tile_mode`; pressed
+    /// again, it goes back to the place and size it had.
+    pub fn ideal_size(&mut self, idx: usize) {
+        let id = self.windows[idx].id;
+        let size = self.windows[idx].window.geometry().size;
+        if let Some(&IdealRestore {
+            pos,
+            ws,
+            size: old,
+            applied,
+        }) = self.ideal_restore.get(&id)
+        {
+            // Apps such as terminals round the size to their cell grid.
+            if (size.w - applied.w).abs() <= IDEAL_SLACK
+                && (size.h - applied.h).abs() <= IDEAL_SLACK
+            {
+                self.ideal_restore.remove(&id);
+                let m = &mut self.windows[idx];
+                if m.placement == Placement::Canvas {
+                    m.pos = pos;
+                    m.ws = ws;
+                }
+                self.configure(idx, Some(old), false, false);
+                self.queue_redraw_all();
+                return;
+            }
+        }
+        let Some(output) = self.output_of(idx).or_else(|| self.active_output()) else {
+            return;
+        };
+        if matches!(
+            self.windows[idx].placement,
+            Placement::Maximized | Placement::Fullscreen
+        ) {
+            self.restore(idx);
+        }
+        let Some(idx) = self.index_of_id(id) else {
+            return;
+        };
+        let (pos, ws, old) = {
+            let m = &self.windows[idx];
+            (m.pos, m.ws, m.window.geometry().size)
+        };
+        let area = self.usable_area(&output).to_f64();
+        let gap = self.config.appearance.gaps as f64;
+        let rect = cells_rect(area, gap, (1, 1), (0, 0, 0, 0));
+        self.place_in_screen_rect(idx, &output, rect);
+        let title = self.title_height(&self.windows[idx]);
+        let zoom = match self.windows[idx].placement {
+            Placement::Canvas => self.workspace(self.windows[idx].ws).target().zoom,
+            _ => 1.0,
+        };
+        let applied = Size::from((
+            (rect.size.w / zoom).round() as i32,
+            (rect.size.h / zoom - title).round() as i32,
+        ));
+        self.ideal_restore.insert(
+            id,
+            IdealRestore {
+                pos,
+                ws,
+                size: old,
+                applied,
+            },
+        );
     }
 
     /// `snap left|right`: the strip for this press, going on to the next

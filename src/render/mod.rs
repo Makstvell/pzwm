@@ -304,7 +304,14 @@ fn cursor_elements<R: PzRenderer>(
         .draw
         .active
         .then_some(smithay::input::pointer::CursorIcon::Crosshair);
-    let icon = match (&state.cursor_override.or(pen), &state.cursor_status) {
+    // Picking an area or tile cells: a crosshair over everything, whatever
+    // the pointer hovers.
+    let picking = (state.area.selecting || state.tile.is_some())
+        .then_some(smithay::input::pointer::CursorIcon::Crosshair);
+    let icon = match (
+        &picking.or(state.cursor_override).or(pen),
+        &state.cursor_status,
+    ) {
         (Some(icon), _) => *icon,
         (None, CursorImageStatus::Hidden) => return,
         (None, CursorImageStatus::Named(icon)) => *icon,

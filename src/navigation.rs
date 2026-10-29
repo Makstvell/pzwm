@@ -41,6 +41,11 @@ impl State {
 
     /// Centers a canvas window and zooms so it fills the visible area.
     pub fn fit_window(&mut self, idx: usize) {
+        self.fit_window_at_most(idx, self.config.canvas.max_zoom);
+    }
+
+    /// Fits the window, zooming in no further than `max_zoom`.
+    pub fn fit_window_at_most(&mut self, idx: usize, max_zoom: f64) {
         let m = &self.windows[idx];
         if m.placement != Placement::Canvas {
             return;
@@ -58,7 +63,8 @@ impl State {
         let ws = m.ws;
         let canvas = &self.config.canvas;
         let margin = self.config.appearance.gaps as f64;
-        let cam = Camera::fitting(frame, area, margin, canvas.min_zoom, canvas.max_zoom);
+        let max_zoom = max_zoom.min(canvas.max_zoom).max(canvas.min_zoom);
+        let cam = Camera::fitting(frame, area, margin, canvas.min_zoom, max_zoom);
         let dur = self.camera_duration();
         self.workspace_mut(ws).animate_to(cam, dur, Instant::now());
         self.queue_redraw(&output);

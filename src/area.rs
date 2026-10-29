@@ -4,12 +4,15 @@
 //! - with `[canvas] new_window_placement = "pick"` every new window waits,
 //!   hidden, until its area is dragged out and then takes exactly that
 //!   area (Escape: the middle of the view);
-//! - next to a **sibling**: a new window of an app that already has one on
-//!   the workspace opens beside it (small ones, like dialogs, over it), the
-//!   way KDE keeps an app's windows together.
+//! - next to a **sibling**: a window an app opens by itself, while it
+//!   already has one on the workspace (same process, nothing launched by
+//!   the user just before), opens beside it (small ones over it) and the
+//!   camera fits it, the way KDE keeps an app's windows together. A window
+//!   the user launches is never a sibling, even of a running app.
 
 use std::time::{Duration, Instant};
 
+use smithay::reexports::wayland_server::Resource;
 use smithay::{
     input::pointer::CursorIcon,
     output::Output,
@@ -28,6 +31,9 @@ const MIN_AREA_PX: f64 = 40.0;
 const DIALOG_SHARE: f64 = 0.6;
 /// Space between a window and its sibling, canvas units, at least.
 const MIN_SIBLING_GAP: f64 = 16.0;
+/// A window appearing this soon after a launch (a `spawn` bind, the
+/// launcher) counts as one the user opened.
+const LAUNCH_WINDOW: Duration = Duration::from_secs(20);
 
 #[derive(Default)]
 pub struct AreaState {
@@ -41,6 +47,8 @@ pub struct AreaState {
     pub window: Option<u64>,
     /// Windows still waiting for their place, oldest first.
     pub waiting: Vec<u64>,
+    /// When the user launched something whose window has not come yet.
+    pub launches: Vec<Instant>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -128,6 +136,7 @@ impl State {
     }
 
     fn begin_area_pick(&mut self, spawn: Option<String>) -> Result<String, String> {
+        self.full_scale_for_pick();
         self.area.selecting = true;
         self.area.spawn = spawn;
         self.cursor_override = Some(CursorIcon::Crosshair);
@@ -149,6 +158,49 @@ impl State {
         }
         self.queue_redraw_all();
         self.pick_next_window();
+    }
+
+    /// With `tile_mode = "zoom"` an area is picked at 100 %, so the screen
+    /// shows real pixels and the ideal sizes match what is seen.
+    fn full_scale_for_pick(&mut self) {
+        if self.config.canvas.tile_mode == "zoom" {
+            if let Some(output) = self.active_output() {
+                self.camera_to_full_scale(&output);
+            }
+        }
+    }
+
+    /// A `spawn` from a bind, the launcher or `pzwm msg`: its window,
+    /// whatever app it is, is the user's own, not an app's further window.
+    pub fn note_user_launch(&mut self) {
+        let now = Instant::now();
+        self.area
+            .launches
+            .retain(|&t| now.duration_since(t) < LAUNCH_WINDOW);
+        self.area.launches.push(now);
+    }
+
+    /// Uses up the oldest recent launch for a window that just appeared.
+    pub fn take_user_launch(&mut self) -> bool {
+        let now = Instant::now();
+        self.area
+            .launches
+            .retain(|&t| now.duration_since(t) < LAUNCH_WINDOW);
+        if self.area.launches.is_empty() {
+            return false;
+        }
+        self.area.launches.remove(0);
+        true
+    }
+
+    /// Process id of the client a window belongs to.
+    fn client_pid(&self, m: &crate::shell::Managed) -> Option<i32> {
+        let surface = m.wl_surface()?;
+        let client = surface.client()?;
+        client
+            .get_credentials(&self.display_handle)
+            .ok()
+            .map(|c| c.pid)
     }
 
     /// "pick" mode: a new window waits for its place instead of opening.
@@ -173,6 +225,7 @@ impl State {
                 continue;
             };
             let app = self.app_id(&self.windows[idx]).unwrap_or_default();
+            self.full_scale_for_pick();
             self.area.window = Some(id);
             self.area.selecting = true;
             self.cursor_override = Some(CursorIcon::Crosshair);
@@ -326,6 +379,7 @@ impl State {
         }
         self.set_pending_area(ws, rect);
         if let Some(cmd) = spawn {
+            self.note_user_launch();
             self.spawn(&cmd);
         }
     }
@@ -400,6 +454,8 @@ impl State {
         }
         let m = &self.windows[idx];
         let app = self.app_id(m).filter(|a| !a.is_empty())?;
+        // Only the same process opens its own further windows.
+        let pid = self.client_pid(m);
         let candidates = || {
             self.windows.iter().filter(|o| {
                 o.id != m.id
@@ -410,6 +466,7 @@ impl State {
                     && o.ws == ws
                     && o.placement == Placement::Canvas
                     && self.app_id(o).as_deref() == Some(app.as_str())
+                    && self.client_pid(o) == pid
             })
         };
         let focused = self.focused.as_ref();

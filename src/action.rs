@@ -69,6 +69,8 @@ pub enum Action {
     Present(String),
     /// Center the window and zoom so it fills the visible area.
     FitWindow,
+    /// The ideal size: the whole usable screen at 100 % (again: back), see tile.rs.
+    IdealSize,
     FocusDir(Dir),
     FocusNext,
     FocusPrev,
@@ -115,6 +117,7 @@ impl Action {
             "pin" | "toggle-pin" => Self::TogglePin,
             "center" | "center-window" => Self::CenterWindow,
             "fit" | "fit-window" => Self::FitWindow,
+            "ideal-size" | "ideal" => Self::IdealSize,
             "profile" if !arg.is_empty() => Self::Profile(arg.to_string()),
             "bookmark" if !arg.is_empty() => Self::Bookmark(arg.to_string()),
             "group" if !arg.is_empty() => Self::Group(arg.to_string()),

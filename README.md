@@ -68,9 +68,12 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 - **Window numbers by place**: `Super+1` … `Super+0` count the windows
   from the top left (or top right, by columns, or in opening order); hold
   `Super` and type more digits for 11, 12 and on.
-- **An app's windows stay together**: a second window of an app that is
-  already open (Zoom, Telegram, a browser) opens beside the first, and
-  dialog-sized ones over it, the way KDE Plasma places them.
+- **An app's windows stay together**: a window an app opens by itself
+  (Zoom's meeting window, a dialog) opens beside or over the one it came
+  from, and the camera fits it, at most at 100 %. A window you launch
+  yourself is never put there, even of an app that is already running.
+- **Ideal size** (`Super+Shift+F`): the window takes the whole screen
+  without the bar at 100 %; again: back to its size and place.
 - **Tile grid** (`Super+T`): a 6 × 4 grid over the screen; drag across the
   cells and the window fills them: a half, a third, a quarter, a sixth,
   any block. Several windows side by side however you like.
@@ -200,8 +203,8 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 |---|---|
 | after you picked an area | filling the area: `Super+O`, then drag a rectangle (Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
 | any other window, with `new_window_placement = "pick"` | nowhere yet: it waits until you drag out its area (the cursor is a crosshair) and then takes exactly that area, size included; a click without dragging keeps it waiting; Escape puts it in the middle of the view. Several new windows wait in turn |
-| a dialog (it has a parent window) | centered over its parent |
-| another window of an app that is already on the workspace | beside that window (right, else below, left, above: the first free side), the camera pans to show it; a window at most 60 % of the other one's size opens over it, like a dialog |
+| a dialog (it has a parent window) | centered over its parent; the camera fits it, at most at 100 % |
+| a further window an app opens by itself (the same process as a window on the workspace, and you launched nothing just before) | beside that window (right, else below, left, above: the first free side), and the camera fits it, at most at 100 %; a window at most 60 % of the other one's size opens over it, like a dialog. A window you launch (a bind, the launcher, `pzwm msg spawn`, within 20 s) or a new process of the same app is yours and opens like any new window |
 | anything else (`new_window_placement = "center"`, the default) | in the middle of the view, 90 % × 90 % of the screen |
 
 - The picked area waits up to a minute for its window and is drawn on the
@@ -210,6 +213,9 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
   over them.
 - Side by side placement is on by default; `[canvas] place_near_siblings =
   false` turns it off.
+- With `tile_mode = "zoom"` (the default) the camera goes to 100 % when a
+  pick starts, so the screen shows real pixels and the "whole screen"
+  size hint is exactly the screen without the bar.
 - Pick mode skips windows placed by a rule with a `position` or a
   `workspace`, windows restored from a desktop profile, the scratchpad,
   dialogs and fixed-size windows.
@@ -320,7 +326,8 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | drag the title bar / `Super+Shift` + left drag | move a window |
 | drag an edge or corner / `Super` + right drag | resize a window |
 | double-click the title bar, `Super+F` | maximize / restore |
-| `Super+Shift+F` | fullscreen / restore |
+| `Super+Shift+F` | ideal size: the whole screen without the bar at 100 % (again: back) |
+| `Super+Ctrl+F` | fullscreen / restore |
 | `Super+P`, pin button | pin to the screen / back to the canvas |
 | `Super+T` | tile grid: drag across cells (or arrows, Shift+arrows, Enter) |
 | `Super+[` / `Super+]` | left / right half; again: ⅓, then ⅔ |
@@ -484,6 +491,7 @@ triggers: `left`, `right`, `middle`, `back`, `forward`, `scroll`.
 | `spawn <command>` | run a shell command |
 | `close`, `maximize`, `fullscreen`, `pin` | window actions |
 | `fit`, `center` | fit the focused window to the screen / center it without zooming |
+| `ideal-size` | the whole usable screen at 100 %; again: back to the size and place it had |
 | `overview`, `minimap`, `home` | overview, minimap, back to the start |
 | `zoom-in`, `zoom-out`, `zoom-reset` | zoom |
 | `focus left\|right\|up\|down\|next\|prev` | move focus |

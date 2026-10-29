@@ -238,6 +238,7 @@ KEY_ACTIONS = (
     "area spawn ",
     "area cancel",
     "tile",
+    "ideal-size",
     "present",
     "present next",
     "present prev",

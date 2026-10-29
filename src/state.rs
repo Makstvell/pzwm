@@ -234,6 +234,8 @@ pub struct State {
     pub window_chord: Option<(usize, Instant)>,
     /// Ideal size shown while a size is dragged, see sizehint.rs.
     pub size_hint: Option<crate::sizehint::SizeHint>,
+    /// Where windows were before `ideal-size`, see tile.rs.
+    pub ideal_restore: HashMap<u64, crate::tile::IdealRestore>,
     /// When `scratchpad` last started its app, so a double press starts one.
     pub scratchpad_spawned: Option<Instant>,
     /// The running `present` show, see present.rs.
@@ -422,6 +424,7 @@ impl State {
             last_snap: None,
             window_chord: None,
             size_hint: None,
+            ideal_restore: HashMap::new(),
             scratchpad_spawned: None,
             presentation: None,
             draw: crate::draw::Drawing::load(),
