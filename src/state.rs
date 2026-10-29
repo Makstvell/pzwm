@@ -226,6 +226,10 @@ pub struct State {
     pub last_collapsed: Option<(String, Option<u64>)>,
     /// Area picked for the next window and the selection mode, see area.rs.
     pub area: crate::area::AreaState,
+    /// The cell grid of `tile`, while it is open, see tile.rs.
+    pub tile: Option<crate::tile::TileMode>,
+    /// Last `snap left|right`: window, side, share step, when; see tile.rs.
+    pub last_snap: Option<(u64, crate::action::Dir, usize, Instant)>,
     /// When `scratchpad` last started its app, so a double press starts one.
     pub scratchpad_spawned: Option<Instant>,
     /// The running `present` show, see present.rs.
@@ -410,6 +414,8 @@ impl State {
             collapsed_groups: Default::default(),
             last_collapsed: None,
             area: Default::default(),
+            tile: None,
+            last_snap: None,
             scratchpad_spawned: None,
             presentation: None,
             draw: crate::draw::Drawing::load(),

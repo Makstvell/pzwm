@@ -379,7 +379,8 @@ impl State {
         self.queue_redraw_all();
     }
 
-    /// Tiles a canvas window to the left/right half of what is on screen.
+    /// Tiles a canvas window to the left/right of what is on screen: a half,
+    /// then a third and two thirds on repeated presses, see tile.rs.
     pub fn snap(&mut self, idx: usize, dir: Dir) {
         match dir {
             Dir::Up => return self.maximize(idx),
@@ -395,7 +396,7 @@ impl State {
         ) {
             self.restore(idx);
         }
-        let rect = self.half_rect(&output, dir);
+        let rect = self.snap_share_rect(idx, &output, dir);
         self.place_in_screen_rect(idx, &output, rect);
     }
 

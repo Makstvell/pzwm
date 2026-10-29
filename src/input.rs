@@ -555,6 +555,15 @@ impl State {
             under,
             Under::Empty | Under::Decoration { .. } | Under::Surface { layer: None, .. }
         );
+        if self.tile.is_some() {
+            // The grid covers the screen: left picks cells, right closes it.
+            if button == BTN_LEFT {
+                grabs::start_tile(self, serial, button);
+            } else {
+                self.end_tile();
+            }
+            return;
+        }
         if self.area.selecting && over_canvas && button == BTN_LEFT {
             grabs::start_area(self, serial, button);
             return;

@@ -96,6 +96,7 @@ impl State {
             "group": m.group,
             "hidden": !self.shown(m),
             "scratchpad": m.scratchpad,
+            "awaiting_pick": m.awaiting_pick,
         })
     }
 

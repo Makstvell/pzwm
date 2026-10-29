@@ -25,23 +25,24 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 3. [First steps](#first-steps)
 4. [How it works](#how-it-works)
 5. [Where new windows open](#where-new-windows-open)
-6. [Shortcuts](#shortcuts)
-7. [Helper apps](#helper-apps)
-8. [Settings app: pzwm config](#settings-app-pzwm-config)
-9. [Configuration file](#configuration-file)
-10. [Workspaces and the bar](#workspaces-and-the-bar)
-11. [Monitors](#monitors)
-12. [Desktop profiles](#desktop-profiles)
-13. [Groups, bookmarks and find](#groups-bookmarks-and-find)
-14. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
-15. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
-16. [Scripting: pzwm msg](#scripting-pzwm-msg)
-17. [Works with](#works-with)
-18. [Troubleshooting](#troubleshooting)
-19. [For developers](#for-developers)
-20. [Similar projects](#similar-projects)
-21. [Credits](#credits)
-22. [License](#license)
+6. [Putting windows on the screen: tile grid, halves, corners](#putting-windows-on-the-screen-tile-grid-halves-corners)
+7. [Shortcuts](#shortcuts)
+8. [Helper apps](#helper-apps)
+9. [Settings app: pzwm config](#settings-app-pzwm-config)
+10. [Configuration file](#configuration-file)
+11. [Workspaces and the bar](#workspaces-and-the-bar)
+12. [Monitors](#monitors)
+13. [Desktop profiles](#desktop-profiles)
+14. [Groups, bookmarks and find](#groups-bookmarks-and-find)
+15. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
+16. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
+17. [Scripting: pzwm msg](#scripting-pzwm-msg)
+18. [Works with](#works-with)
+19. [Troubleshooting](#troubleshooting)
+20. [For developers](#for-developers)
+21. [Similar projects](#similar-projects)
+22. [Credits](#credits)
+23. [License](#license)
 
 ## Features
 
@@ -55,11 +56,19 @@ is no tiling grid: put windows anywhere and zoom out to see all of them.
 - **Open a window where you want it**: drag out an area (`Super+O`, or
   `Super+Ctrl` + left drag) and the next window fills it;
   `Super+Shift+Return` does the same and starts a terminal there.
+- **Pick mode** (`[canvas] new_window_placement = "pick"`): every new
+  window waits until you drag out its place; a click puts it at its own
+  size around the click, Escape in the middle. Dialogs and an app's
+  further windows skip it and open by their parent.
 - **An app's windows stay together**: a second window of an app that is
   already open (Zoom, Telegram, a browser) opens beside the first, and
   dialog-sized ones over it, the way KDE Plasma places them.
-- Maximize, fullscreen, pin a window to the screen, half-screen tiling by
-  dropping a window on a screen edge, magnetic edges.
+- **Tile grid** (`Super+T`): a 6 × 4 grid over the screen; drag across the
+  cells and the window fills them: a half, a third, a quarter, a sixth,
+  any block. Several windows side by side however you like.
+- Maximize, fullscreen, pin a window to the screen, magnetic edges.
+  `Super+[` / `Super+]` snap to the left / right, pressed again ½ → ⅓ →
+  ⅔; drop a window on a screen edge for a half, in a corner for a quarter.
 - Overview of all windows, and a minimap with live window previews.
 - **Wallpaper parallax** (on by default): the wallpaper shifts a little
   against the camera when you pan the canvas, like a far-away backdrop.
@@ -182,9 +191,10 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 | Window | Opens |
 |---|---|
 | after you picked an area | filling the area: `Super+O`, then drag a rectangle (Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
+| any other window, with `new_window_placement = "pick"` | nowhere yet: it waits until you drag out its place (its outline follows the cursor); a click puts it at its own size around the click, Escape in the middle of the view. Several new windows wait in turn |
 | a dialog (it has a parent window) | centered over its parent |
 | another window of an app that is already on the workspace | beside that window (right, else below, left, above: the first free side), the camera pans to show it; a window at most 60 % of the other one's size opens over it, like a dialog |
-| anything else | in the middle of the view, 90 % × 90 % of the screen |
+| anything else (`new_window_placement = "center"`, the default) | in the middle of the view, 90 % × 90 % of the screen |
 
 - The picked area waits up to a minute for its window and is drawn on the
   canvas until then. Dialogs and fixed-size windows do not take it.
@@ -192,8 +202,35 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
   over them.
 - Side by side placement is on by default; `[canvas] place_near_siblings =
   false` turns it off.
+- Pick mode skips windows placed by a rule with a `position` or a
+  `workspace`, windows restored from a desktop profile, the scratchpad,
+  dialogs and fixed-size windows.
 - From scripts: `pzwm msg area`, `area spawn <command>`, `area cancel`,
-  `area rect X,Y WxH` (canvas coordinates, no mouse needed).
+  `area rect X,Y WxH` (canvas coordinates, no mouse needed). In pick mode
+  `area rect` places the waiting window and `area cancel` puts it in the
+  middle. `pzwm msg windows --json` marks waiting windows with
+  `"awaiting_pick": true`.
+
+## Putting windows on the screen: tile grid, halves, corners
+
+The windows still live on the canvas; these place one on part of what the
+screen shows now, at the current zoom.
+
+| How | Result |
+|---|---|
+| `Super+T`, then drag across cells | the focused window fills the cells. Without the mouse: arrows move the selected block, `Shift`+arrows grow it, `Enter` applies, `Esc` (or right click) closes the grid |
+| `Super+[` / `Super+]` | left / right half; pressed again within 3 s: a third, then two thirds |
+| drop a dragged window on the left / right edge | that half |
+| drop it within 120 px of a corner | that quarter |
+| drop it on the top edge | maximize |
+
+Examples with the default 6 × 4 grid: three cells across = a half, two =
+a third, three across and two down = a quarter, the whole top row = a
+wide strip. So one window can take the right half, another the top-left
+quarter, a third the bottom-left quarter, or any other mix.
+`[canvas] tile_grid = "4x4"` (up to 12x12) changes the grid.
+From scripts: `pzwm msg tile`, then `tile left|right|up|down`,
+`tile grow <dir>`, `tile apply`, `tile cancel`.
 
 ## Shortcuts
 
@@ -231,7 +268,9 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | double-click the title bar, `Super+F` | maximize / restore |
 | `Super+Shift+F` | fullscreen / restore |
 | `Super+P`, pin button | pin to the screen / back to the canvas |
-| drop on the left or right screen edge, `Super+[` / `Super+]` | fill that half of the screen |
+| `Super+T` | tile grid: drag across cells (or arrows, Shift+arrows, Enter) |
+| `Super+[` / `Super+]` | left / right half; again: ⅓, then ⅔ |
+| drop on the left or right screen edge / in a corner | fill that half / quarter of the screen |
 | drop on the top screen edge | maximize |
 | `Super+Q` | close |
 | `Super+O`, then drag / `Super+Ctrl` + left drag | pick the area the next window opens in |
@@ -311,7 +350,7 @@ Open **pzwm config** from your app launcher, or run `pzwm-config`. It edits
 |---|---|
 | General | autostart commands, scale, cursor theme and size, X11 apps, title bars, desktop autosave |
 | Input | keyboard layouts and options, key repeat, touchpad, pointer speed |
-| Canvas | size of new windows, zoom step and limits, mouse behavior, grid, semantic zoom |
+| Canvas | size of new windows, where they open (center or pick), side by side placement, tile grid, zoom step and limits, mouse behavior, grid, semantic zoom |
 | Monitors | connected monitors with their current mode; mode (picked from what the monitor offers), scale, position, mirroring, disabling |
 | Appearance | gaps, borders, corners, title bars, shadows, colors |
 | Animation | on/off and durations |
@@ -347,7 +386,7 @@ the old settings and shows a notification.
 |---|---|
 | `[general]` | autostart commands, scale, cursor, X11 apps, systemd session, auto reload |
 | `[input]` | keyboard layouts (at most 4), XKB options, key repeat, touchpad, pointer speed |
-| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size, `place_near_siblings` |
+| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size, `new_window_placement` (`center`/`pick`), `place_near_siblings`, `tile_grid` |
 | `[[output]]` | one block per monitor: mode, scale, position, mirror, disable |
 | `[appearance]` | gaps, borders, corners, title bars, shadows, colors (`"#RRGGBB"` or `"#RRGGBBAA"`) |
 | `[animation]` | animations on/off and their length |
@@ -395,7 +434,8 @@ triggers: `left`, `right`, `middle`, `back`, `forward`, `scroll`.
 | `zoom-in`, `zoom-out`, `zoom-reset` | zoom |
 | `focus left\|right\|up\|down\|next\|prev` | move focus |
 | `move-window <dir>`, `resize-window <dir>`, `pan <dir>` | keyboard move / resize / pan |
-| `snap left\|right\|up\|down` | half screen, maximize, restore |
+| `snap left\|right\|up\|down` | left / right (again: ⅓, ⅔), maximize, restore |
+| `tile [left\|right\|up\|down\|grow <dir>\|apply\|cancel]` | the tile grid, see [Putting windows on the screen](#putting-windows-on-the-screen-tile-grid-halves-corners) |
 | `workspace <1-10>`, `move-to-workspace <1-10>` | workspaces |
 | `window <1-10>` | the n-th window in the order it was opened |
 | `profile save\|load\|delete <name>`, `profile rename <old> <new>` | [desktop profiles](#desktop-profiles) |
@@ -771,7 +811,8 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | `src/toplevels.rs` | window lists for taskbars (foreign-toplevel) |
 | `src/output_management.rs`, `src/gamma.rs` | monitor tools and night light |
 | `src/rules.rs`, `src/scratchpad.rs` | window rules, drop-down window |
-| `src/area.rs` | picked area for the next window, placing an app's windows side by side |
+| `src/area.rs` | picked area for the next window, pick mode, placing an app's windows side by side |
+| `src/tile.rs` | tile grid, snap ½ → ⅓ → ⅔, corner quarters |
 | `src/draw.rs`, `src/render/drawings.rs` | drawing on the canvas: strokes, eraser, saving, rendering |
 | `src/present.rs`, `src/arrange.rs` | presentation through bookmarks, one-shot layouts |
 | `src/icons.rs`, `src/render/semantic.rs` | app icon lookup, semantic-zoom cards |

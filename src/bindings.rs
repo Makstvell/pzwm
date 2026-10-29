@@ -78,6 +78,12 @@ impl State {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::ToggleMinimap));
                 }
+                if state.tile.is_some() && !pressed.logo {
+                    if let Some(action) = tile_key(pressed, sym) {
+                        state.suppressed_keys.push(keycode);
+                        return FilterResult::Intercept(Some(action));
+                    }
+                }
                 if state.area.selecting && sym == Keysym::Escape {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::Area("cancel".into())));
@@ -167,6 +173,10 @@ impl State {
             Action::Area(args) => {
                 let result = self.area_command(&args);
                 self.notify_result("area", result, false);
+            }
+            Action::Tile(args) => {
+                let result = self.tile_command(&args);
+                self.notify_result("tile", result, false);
             }
             Action::Arrange(how) => {
                 let result = self.arrange(how);
@@ -428,6 +438,26 @@ fn pen_key(mods: Mods, sym: Keysym) -> Option<Action> {
                 .contains(&raw)
                 .then(|| Action::Draw(format!("color {}", raw - Keysym::_0.raw())))
         }
+    }
+}
+
+/// Keys the `tile` grid takes while it is open (without Super): arrows
+/// move the block, Shift+arrows grow it, Enter applies, Escape closes.
+fn tile_key(mods: Mods, sym: Keysym) -> Option<Action> {
+    let tile = |arg: &str| Some(Action::Tile(arg.to_string()));
+    let dir = match sym {
+        Keysym::Left | Keysym::h => "left",
+        Keysym::Right | Keysym::l => "right",
+        Keysym::Up | Keysym::k => "up",
+        Keysym::Down | Keysym::j => "down",
+        Keysym::Return | Keysym::KP_Enter | Keysym::space => return tile("apply"),
+        Keysym::Escape => return tile("cancel"),
+        _ => return None,
+    };
+    if mods.shift {
+        tile(&format!("grow {dir}"))
+    } else {
+        tile(dir)
     }
 }
 

@@ -34,6 +34,7 @@ mod screencopy;
 mod shell;
 mod state;
 mod tablet;
+mod tile;
 mod toplevels;
 
 use std::{

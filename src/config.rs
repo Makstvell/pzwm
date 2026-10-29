@@ -142,6 +142,11 @@ pub struct Canvas {
     /// A new window of an app that already has one on the workspace opens
     /// beside it (dialog-sized ones over it) instead of in the middle.
     pub place_near_siblings: bool,
+    /// Where a new window opens: "center" (the middle of the view) or
+    /// "pick" (drag out its place first, see area.rs).
+    pub new_window_placement: String,
+    /// Cells of the `tile` grid, "COLSxROWS".
+    pub tile_grid: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -422,6 +427,8 @@ impl Default for Canvas {
             new_window_height: 0.9,
             semantic_zoom: 0.3,
             place_near_siblings: true,
+            new_window_placement: "center".into(),
+            tile_grid: "6x4".into(),
         }
     }
 }

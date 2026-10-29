@@ -73,6 +73,14 @@ semantic_zoom = 0.3
 # A new window of an app that already has one on the workspace (a second
 # Zoom or Telegram window) opens beside it; dialog-sized ones open over it.
 place_near_siblings = true
+# Where any other new window opens: "center" (the middle of the view) or
+# "pick" (it waits until you drag out its place; a click puts it at its own
+# size around the click, Escape in the middle). Dialogs and an app's further
+# windows never wait.
+new_window_placement = "center"
+# Cells of the Super+T grid, "COLSxROWS" (up to 12x12): 6x4 makes halves,
+# thirds, quarters and sixths.
+tile_grid = "6x4"
 
 [minimap]
 # Map of the whole workspace with live previews of every window and the
@@ -329,6 +337,9 @@ pinned_accent = "#f59e0b"
 "Super+Alt+D" = "draw hide"
 # Pick an area with the mouse: the next window opens there (Esc cancels).
 "Super+O" = "area"
+# Put the window on cells of a grid: drag across them, or arrows,
+# Shift+arrows and Enter.
+"Super+T" = "tile"
 "Super+Shift+Return" = "area spawn ${TERMINAL:-foot}"
 # Presentation through the bookmarks.
 "Super+F5" = "present"

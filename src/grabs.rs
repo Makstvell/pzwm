@@ -32,6 +32,8 @@ const MIN_W: f64 = 120.0;
 const MIN_H: f64 = 60.0;
 /// Distance from a screen edge that triggers edge tiling while dragging.
 const EDGE_TILE_PX: f64 = 4.0;
+/// How far from a screen corner, along its edges, a drop fills the quarter.
+const CORNER_ZONE_PX: f64 = 120.0;
 const ANCHOR_HOLD: Duration = Duration::from_millis(400);
 
 pub enum Interaction {
@@ -60,6 +62,8 @@ pub enum Interaction {
         id: u64,
         erase: bool,
     },
+    /// Picking cells of the `tile` grid, see tile.rs.
+    Tile { output: Output },
     /// Dragging out the area for the next window, see area.rs.
     Area {
         output: Output,
@@ -146,6 +150,21 @@ pub fn start_draw(
             erase,
         },
         icon,
+        serial,
+        button,
+    );
+}
+
+/// Starts picking cells of the open `tile` grid at the cursor.
+pub fn start_tile(state: &mut State, serial: Serial, button: u32) {
+    let Some(output) = state.tile.as_ref().map(|t| t.output.clone()) else {
+        return;
+    };
+    state.tile_drag_to_cursor(true);
+    begin(
+        state,
+        Interaction::Tile { output },
+        CursorIcon::Crosshair,
         serial,
         button,
     );
@@ -397,6 +416,10 @@ impl State {
                 self.queue_redraw(&output);
                 Interaction::Area { output, ws, start }
             }
+            Interaction::Tile { output } => {
+                self.tile_drag_to_cursor(false);
+                Interaction::Tile { output }
+            }
             Interaction::Resize {
                 id,
                 edges,
@@ -475,11 +498,30 @@ impl State {
             return None;
         }
         let size = self.output_geometry(output).size.to_f64();
-        let rect = if local.x <= EDGE_TILE_PX {
+        let (left, right) = (local.x <= EDGE_TILE_PX, local.x >= size.w - EDGE_TILE_PX);
+        let (top, bottom) = (local.y <= EDGE_TILE_PX, local.y >= size.h - EDGE_TILE_PX);
+        // Near a corner (on either of its edges): that quarter of the screen.
+        let near_left = local.x <= CORNER_ZONE_PX;
+        let near_right = local.x >= size.w - CORNER_ZONE_PX;
+        let near_top = local.y <= CORNER_ZONE_PX;
+        let near_bottom = local.y >= size.h - CORNER_ZONE_PX;
+        let corner = match () {
+            _ if (left || top) && near_left && near_top => Some((true, true)),
+            _ if (right || top) && near_right && near_top => Some((false, true)),
+            _ if (left || bottom) && near_left && near_bottom => Some((true, false)),
+            _ if (right || bottom) && near_right && near_bottom => Some((false, false)),
+            _ => None,
+        };
+        if let Some((l, t)) = corner {
+            let area = self.usable_area(output).to_f64();
+            let gap = self.config.appearance.gaps as f64;
+            return Some((output.clone(), crate::tile::quarter_rect(area, gap, l, t)));
+        }
+        let rect = if left {
             self.half_rect(output, Dir::Left)
-        } else if local.x >= size.w - EDGE_TILE_PX {
+        } else if right {
             self.half_rect(output, Dir::Right)
-        } else if local.y <= EDGE_TILE_PX {
+        } else if top {
             let area = self.usable_area(output).to_f64();
             let gap = self.config.appearance.gaps as f64;
             Rectangle::new(
@@ -598,6 +640,7 @@ impl State {
             Some(Interaction::Area { output, ws, start }) => {
                 self.area_drag_finished(&output, ws, start)
             }
+            Some(Interaction::Tile { .. }) => self.tile_apply(),
             Some(Interaction::Pan { .. } | Interaction::MoveGroup { .. }) | None => {}
         }
         // We are inside the pointer's grab callback: touching the pointer

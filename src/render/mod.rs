@@ -104,6 +104,8 @@ pub struct RenderCache {
     /// Ids of minimap previews, by output and the surface element they copy.
     thumbs: HashMap<(String, Id), Id>,
     preview: ShaderElement,
+    /// Cells of the `tile` grid by index; the selection uses `preview`.
+    tiles: HashMap<usize, ShaderElement>,
     /// Group frames by output and group name.
     groups: HashMap<(String, String), ShaderElement>,
     /// Drawing segments by output, stroke id and segment index.
@@ -210,6 +212,7 @@ pub fn scaled_output_elements<R: PzRenderer>(
         if let Some(rect) = state.area_screen_rect(output) {
             out.push(PzElement::Shader(preview_element(state, rect, os, sh)));
         }
+        tile_elements(state, output, os, sh, &mut out);
     }
 
     // The edge-tiling preview sits right under the window being dragged.
@@ -656,6 +659,36 @@ fn thumbnail_elements<R: PzRenderer>(
             ClippedSurface::new(zoomed, tex_size, clip, sh.clip.clone())
         })
         .collect()
+}
+
+/// The `tile` grid: the selected block on top of dim cells.
+fn tile_elements<R: PzRenderer>(
+    state: &mut State,
+    output: &Output,
+    os: f64,
+    sh: &Shaders,
+    out: &mut Vec<PzElement<R>>,
+) {
+    let Some((cells, selected)) = state.tile_overlay(output) else {
+        state.render_cache.tiles.clear();
+        return;
+    };
+    out.push(PzElement::Shader(preview_element(state, selected, os, sh)));
+    let [r, g, b, _] = state.config.appearance.active_border_start;
+    let radius = (state.config.appearance.corner_radius as f64 * os) as f32;
+    for (i, cell) in cells.into_iter().enumerate() {
+        let uniforms = [
+            ("u_fill", ShaderValue::F4([r, g, b, 0.10])),
+            ("u_stroke", ShaderValue::F4([r, g, b, 0.45])),
+            ("u_radius", ShaderValue::F1(radius)),
+            ("u_border", ShaderValue::F1((1.5 * os) as f32)),
+        ];
+        let elem = state.render_cache.tiles.entry(i).or_default();
+        out.push(PzElement::Shader(
+            elem.update(&sh.rect, phys_rect(cell, os), 1.0, &uniforms)
+                .clone(),
+        ));
+    }
 }
 
 fn preview_element(

@@ -1,6 +1,9 @@
 //! Where new windows go besides the middle of the view:
 //! - an **area** the user drags out on the canvas (`area`, Super+O, or
 //!   Super+Ctrl + left drag): the next window that opens fills it;
+//! - with `[canvas] new_window_placement = "pick"` every new window waits,
+//!   hidden, until its place is dragged out (a click: its own size around
+//!   the click, Escape: the middle of the view);
 //! - next to a **sibling**: a new window of an app that already has one on
 //!   the workspace opens beside it (small ones, like dialogs, over it), the
 //!   way KDE keeps an app's windows together.
@@ -34,6 +37,10 @@ pub struct AreaState {
     pub spawn: Option<String>,
     /// The picked area, waiting for the next window.
     pub pending: Option<PendingArea>,
+    /// The window the current pick places ("pick" mode).
+    pub window: Option<u64>,
+    /// Windows still waiting for their place, oldest first.
+    pub waiting: Vec<u64>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -103,6 +110,16 @@ impl State {
                 let rect = parse_rect(rest).ok_or("usage: area rect X,Y WxH")?;
                 let output = self.active_output().ok_or("no output")?;
                 let ws = self.output_ws(&output);
+                // A window is waiting for its place: this is it.
+                if let Some(id) = self.area.window.take() {
+                    self.area.selecting = false;
+                    if self.interaction.is_none() {
+                        self.cursor_override = None;
+                    }
+                    self.show_picked(id, Some((ws, rect)));
+                    self.pick_next_window();
+                    return Ok("placed".into());
+                }
                 self.set_pending_area(ws, rect);
                 Ok("the next window opens in the area".into())
             }
@@ -118,12 +135,109 @@ impl State {
         Ok("drag an area for the next window (Esc cancels)".into())
     }
 
+    /// Escape / `area cancel`: drops the pick and a waiting area; a window
+    /// whose place was being picked opens where it would have without.
     pub fn cancel_area(&mut self) {
         if self.area.selecting && self.interaction.is_none() {
             self.cursor_override = None;
         }
-        self.area = AreaState::default();
+        self.area.selecting = false;
+        self.area.spawn = None;
+        self.area.pending = None;
+        if let Some(id) = self.area.window.take() {
+            self.show_picked(id, None);
+        }
         self.queue_redraw_all();
+        self.pick_next_window();
+    }
+
+    /// "pick" mode: a new window waits for its place instead of opening.
+    pub fn wait_for_pick(&mut self, idx: usize) {
+        self.windows[idx].awaiting_pick = true;
+        self.area.waiting.push(self.windows[idx].id);
+        self.pick_next_window();
+    }
+
+    /// Starts picking the place of the oldest waiting window, if no pick
+    /// is going on.
+    pub fn pick_next_window(&mut self) {
+        if self.area.selecting {
+            return;
+        }
+        while !self.area.waiting.is_empty() {
+            let id = self.area.waiting.remove(0);
+            let Some(idx) = self
+                .index_of_id(id)
+                .filter(|&i| self.windows[i].awaiting_pick)
+            else {
+                continue;
+            };
+            let app = self.app_id(&self.windows[idx]).unwrap_or_default();
+            self.area.window = Some(id);
+            self.area.selecting = true;
+            self.cursor_override = Some(CursorIcon::Crosshair);
+            let quote = crate::bindings::shell_quote;
+            self.spawn(&format!(
+                "notify-send -a pzwm -t 4000 \
+                 -h string:x-canonical-private-synchronous:pzwm-pick {} {}",
+                quote(&format!("Place {app}")),
+                quote("Drag its area · click: its size here · Esc: the middle"),
+            ));
+            self.queue_redraw_all();
+            return;
+        }
+    }
+
+    /// Shows a window that waited for its place: in `rect` (canvas, whole
+    /// frame), or where map_window put it when `None`.
+    fn show_picked(&mut self, id: u64, rect: Option<(usize, Rectangle<f64, Logical>)>) {
+        let Some(idx) = self.index_of_id(id) else {
+            return;
+        };
+        let title = self.title_height(&self.windows[idx]);
+        let m = &mut self.windows[idx];
+        m.awaiting_pick = false;
+        m.opened_at = Some(Instant::now());
+        if let Some((ws, rect)) = rect {
+            m.ws = ws;
+            m.pos = Point::from((rect.loc.x, rect.loc.y + title));
+            let size = Size::from((
+                rect.size.w.round() as i32,
+                (rect.size.h - title).round().max(1.0) as i32,
+            ));
+            if (m.size().w - size.w as f64).abs() > 1.0 || (m.size().h - size.h as f64).abs() > 1.0
+            {
+                self.configure(idx, Some(size), false, false);
+            }
+        }
+        let window = self.windows[idx].window.clone();
+        self.focus_window(Some(window));
+        self.queue_redraw_all();
+    }
+
+    /// A window that is gone or got its place from a rule needs no pick.
+    pub fn forget_pick(&mut self, id: u64) {
+        self.area.waiting.retain(|&w| w != id);
+        if self.area.window == Some(id) {
+            self.area.window = None;
+            self.area.selecting = false;
+            if self.interaction.is_none() {
+                self.cursor_override = None;
+            }
+            self.queue_redraw_all();
+            self.pick_next_window();
+        }
+    }
+
+    /// Frame size of the window being placed, canvas units.
+    fn picked_frame_size(&self) -> Option<Size<f64, Logical>> {
+        self.picked_frame_size_of(self.area.window?)
+    }
+
+    fn picked_frame_size_of(&self, id: u64) -> Option<Size<f64, Logical>> {
+        let m = &self.windows[self.index_of_id(id)?];
+        let size = m.size();
+        Some(Size::from((size.w, size.h + self.title_height(m))))
     }
 
     fn set_pending_area(&mut self, ws: usize, rect: Rectangle<f64, Logical>) {
@@ -156,7 +270,20 @@ impl State {
         let rect = span(start, end);
         let spawn = self.area.spawn.take();
         self.area.selecting = false;
-        if rect.size.w * cam.zoom < MIN_AREA_PX || rect.size.h * cam.zoom < MIN_AREA_PX {
+        let small = rect.size.w * cam.zoom < MIN_AREA_PX || rect.size.h * cam.zoom < MIN_AREA_PX;
+        if let Some(id) = self.area.window.take() {
+            // A click keeps the window's own size, centered on the click.
+            let rect = match (small, self.picked_frame_size_of(id)) {
+                (true, Some(size)) => {
+                    Rectangle::new((end.x - size.w / 2.0, end.y - size.h / 2.0).into(), size)
+                }
+                _ => rect,
+            };
+            self.show_picked(id, Some((ws, rect)));
+            self.pick_next_window();
+            return;
+        }
+        if small {
             self.cancel_area();
             return;
         }
@@ -182,6 +309,14 @@ impl State {
                     *start,
                     cam.to_canvas(self.cursor_local(output)),
                 )));
+            }
+        }
+        // Picking a waiting window's place: its outline follows the cursor.
+        if self.area.selecting && self.interaction.is_none() {
+            if let Some(size) = self.picked_frame_size() {
+                let c = self.cursor_local(output);
+                let s = size.upscale(cam.zoom);
+                return Some(Rectangle::new((c.x - s.w / 2.0, c.y - s.h / 2.0).into(), s));
             }
         }
         let p = self.area.pending?;
@@ -243,6 +378,7 @@ impl State {
                 o.id != m.id
                     && o.mapped
                     && !o.hidden
+                    && !o.awaiting_pick
                     && !o.scratchpad
                     && o.ws == ws
                     && o.placement == Placement::Canvas
@@ -266,7 +402,13 @@ impl State {
         let others: Vec<_> = self
             .windows
             .iter()
-            .filter(|o| o.id != m.id && o.mapped && o.ws == ws && o.placement == Placement::Canvas)
+            .filter(|o| {
+                o.id != m.id
+                    && o.mapped
+                    && !o.awaiting_pick
+                    && o.ws == ws
+                    && o.placement == Placement::Canvas
+            })
             .map(|o| self.canvas_frame(o))
             .collect();
         let gap = (self.config.appearance.gaps as f64).max(MIN_SIBLING_GAP);

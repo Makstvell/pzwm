@@ -60,6 +60,9 @@ pub enum Action {
     /// `area [spawn CMD] | cancel | rect X,Y WxH`: where the next window
     /// opens, see area.rs.
     Area(String),
+    /// `tile [left|right|up|down|grow DIR|apply|cancel]`: put the focused
+    /// window on cells of a grid over the screen, see tile.rs.
+    Tile(String),
     /// Line up the focused group (or the workspace) once, see arrange.rs.
     Arrange(crate::arrange::Arrangement),
     /// `present [start|stop|next|prev]`: fly through the bookmarks.
@@ -124,6 +127,7 @@ impl Action {
             "find" | "search" => Self::Find,
             "draw" => Self::Draw(arg.to_string()),
             "area" => Self::Area(arg.to_string()),
+            "tile" | "grid" => Self::Tile(arg.to_string()),
             "arrange" => Self::Arrange(crate::arrange::Arrangement::parse(arg)?),
             "present" | "presentation" => Self::Present(arg.to_string()),
             "focus" => match arg {

@@ -108,6 +108,8 @@ pub struct Managed {
     /// Until then, window rules are checked again on every commit: apps
     /// such as Chrome set their title only after the window appears.
     pub late_rules: Option<Instant>,
+    /// "pick" placement: hidden until its place is dragged out, see area.rs.
+    pub awaiting_pick: bool,
 }
 
 impl Managed {
@@ -241,6 +243,7 @@ impl State {
     pub fn shown(&self, m: &Managed) -> bool {
         m.mapped
             && !m.hidden
+            && !m.awaiting_pick
             && !m
                 .group
                 .as_ref()
@@ -431,6 +434,7 @@ impl State {
                 group: None,
                 area: None,
                 late_rules: None,
+                awaiting_pick: false,
             },
         );
     }
@@ -581,12 +585,26 @@ impl State {
         m.opened_at = Some(Instant::now());
         let from_profile = self.place_from_profile(idx);
         let ruled = !from_profile && self.apply_rules(idx);
+        // Dialogs and an app's further windows open by their parent or
+        // sibling; everything else asks for its place in "pick" mode.
+        let pick = !ruled
+            && !from_profile
+            && area.is_none()
+            && parent_frame.is_none()
+            && sibling.is_none()
+            && self.config.canvas.new_window_placement == "pick"
+            && !self.windows[idx].scratchpad
+            && !self.is_dialog_like(idx);
         if !ruled {
             if !from_profile {
                 self.windows[idx].late_rules = Some(Instant::now() + LATE_RULES);
             }
-            let window = self.windows[idx].window.clone();
-            self.focus_window(Some(window));
+            if pick {
+                self.wait_for_pick(idx);
+            } else {
+                let window = self.windows[idx].window.clone();
+                self.focus_window(Some(window));
+            }
         }
         if let Some(idx) = self.index_of_id(id) {
             let m = &mut self.windows[idx];
@@ -626,6 +644,11 @@ impl State {
             return;
         };
         self.windows[idx].late_rules = None;
+        // The rule places it: no need to ask for a place any more.
+        if std::mem::take(&mut self.windows[idx].awaiting_pick) {
+            let id = self.windows[idx].id;
+            self.forget_pick(id);
+        }
         if let Some(size) = effect.size {
             // We are inside the window's commit: resize once it is handled.
             let id = self.windows[idx].id;
@@ -654,6 +677,7 @@ impl State {
             return;
         };
         let removed = self.windows.remove(idx);
+        self.forget_pick(removed.id);
         if let Some(
             crate::grabs::Interaction::Move { id, .. }
             | crate::grabs::Interaction::Resize { id, .. },
