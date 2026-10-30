@@ -214,7 +214,7 @@ impl State {
                 continue;
             };
             let app = self.app_id(&self.windows[idx]).unwrap_or_default();
-                self.area.window = Some(id);
+            self.area.window = Some(id);
             self.area.selecting = true;
             self.cursor_override = Some(CursorIcon::Crosshair);
             let quote = crate::bindings::shell_quote;

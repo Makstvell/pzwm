@@ -204,7 +204,10 @@ mod tests {
     #[test]
     fn ideal_entries_parse() {
         assert_eq!(parse_ideal("screen"), Some(IdealSpec::Screen));
-        assert_eq!(parse_ideal(" 1920x1080 "), Some(IdealSpec::Content(1920.0, 1080.0)));
+        assert_eq!(
+            parse_ideal(" 1920x1080 "),
+            Some(IdealSpec::Content(1920.0, 1080.0))
+        );
         assert_eq!(parse_ideal("0x10"), None);
         assert_eq!(parse_ideal("big"), None);
     }
