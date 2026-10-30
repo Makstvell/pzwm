@@ -7,7 +7,9 @@
 
 [English →](README.md)
 
-https://github.com/user-attachments/assets/c0e63f2d-d8f0-43a3-bd77-575234b23a23
+https://github.com/user-attachments/assets/80dc6676-0ce2-4711-909a-0cd07370d726
+
+<sub>Перший із десяти коротких демо-роликів (англійською); решта — у розділах, які вони показують: [відкриття вікон](#де-відкриваються-нові-вікна), [ідеальний розмір](#підказки-розміру), [мінікарта й групи](#групи-закладки-пошук), [пошук](#групи-закладки-пошук), [малювання й презентація](#малювання-презентація-розкладка-семантичний-зум), [налаштування](#налаштування), [воркспейси](#можливості).</sub>
 
 ### Два режими відкриття вікон
 
@@ -116,6 +118,11 @@ https://github.com/user-attachments/assets/c0e63f2d-d8f0-43a3-bd77-575234b23a23
   **скретчпад** (``Super+` ``), **правила вікон** (`[[rule]]`).
 
 **Робочий стіл**
+
+*▶ Воркспейси (17 с)*
+
+https://github.com/user-attachments/assets/67c46574-3bdd-416f-9a81-e1b22c3bd2a4
+
 - 10 воркспейсів у барі DankMaterialShell.
 - **Профілі**: зберегти, де лежать програми, і повернути пізніше; вікно
   **Desktop Profiles** (`Super+Shift+P`) для керування ними; профіль
@@ -224,6 +231,10 @@ cd pzwm
 
 ## Де відкриваються нові вікна
 
+*▶ Відкриття вікон: вибір зони, режим вибору місця, вікна, які програма відкриває сама (67 с)*
+
+https://github.com/user-attachments/assets/2545b96e-a037-4c10-bad6-c860371ea3ec
+
 | Вікно | Де з'являється |
 |---|---|
 | після вибору зони | заповнює зону: `Super+O` і протягнути прямокутник (`Esc` — скасувати), або одразу `Super+Ctrl`+ліва; `Super+Shift+Return` — зона і термінал у ній |
@@ -250,6 +261,10 @@ cd pzwm
   у `pzwm msg windows --json` такі вікна мають `"awaiting_pick": true`.
 
 ### Підказки розміру
+
+*▶ Вписати в екран та ідеальний розмір (13 с)*
+
+https://github.com/user-attachments/assets/551bd2a2-05af-48ad-8af7-768fea7bd2db
 
 Коли виділяєш зону (`Super+O`, режим вибору) або тягнеш край вікна,
 **ідеальний розмір** з'являється контуром, а ближче ~24 px розмір
@@ -344,6 +359,10 @@ Profiles. Зберігаються лише змінені рядки, коме�
 
 ## Налаштування
 
+*▶ Програма налаштувань і профілі робочого столу (13 с)*
+
+https://github.com/user-attachments/assets/3d4b0605-872e-42a9-958f-d64265e03f3a
+
 `~/.config/pzwm/config.toml`; усі опції з коментарями — у
 [`resources/default-config.toml`](resources/default-config.toml).
 Перевірка: `pzwm --check-config`. Зміни застосовуються після збереження;
@@ -430,6 +449,14 @@ pzwm msg profile delete office
 
 ## Групи, закладки, пошук
 
+*▶ Мінікарта, групи й розміщення (30 с)*
+
+https://github.com/user-attachments/assets/c7dd4721-93db-42c3-a4ae-c4440ee013f3
+
+*▶ Пошук вікна (10 с)*
+
+https://github.com/user-attachments/assets/925c13e8-2edd-4a59-bff9-b3f961ca5637
+
 - **Група** — вікна з однією назвою; навколо них рамка кольору, що
   залежить від назви. `Super+G` згортає групу (лишається рамка), клік по
   рамці чи `Super+G` над нею — розгортає. Якщо одразу натиснути `Super+G`
@@ -447,6 +474,14 @@ pzwm msg profile delete office
   стати правилом `scratchpad = true`.
 
 ## Малювання, презентація, розкладка, семантичний зум
+
+*▶ Малювання на полотні (19 с)*
+
+https://github.com/user-attachments/assets/797b3ce6-0acd-49f7-ba54-239ba3d6a8a9
+
+*▶ Презентація (21 с)*
+
+https://github.com/user-attachments/assets/e94859a7-0d1c-4bd1-946e-4373adfd7eb1
 
 **Малювання** — полотно як дошка: нотатки й стрілки від вікна до вікна.
 
@@ -549,14 +584,14 @@ xdg-desktop-portal-wlr, grim тощо) — окремі проєкти зі св
 pzwm запускає їх або спілкується з ними через протоколи Wayland, а з
 баром DMS — через локальний сокет; їхнього коду pzwm не містить.
 
-### Демо-відео
+### Демо-ролики
 
-[Демо-відео](https://github.com/user-attachments/assets/c0e63f2d-d8f0-43a3-bd77-575234b23a23) записане в pzwm за допомогою
-[wf-recorder](https://github.com/ammen99/wf-recorder) (MIT) і змонтоване в
+Демо-ролики в цьому README записані в pzwm за допомогою
+[wf-recorder](https://github.com/ammen99/wf-recorder) (MIT) і змонтовані в
 [Remotion](https://www.remotion.dev) (безкоштовно для приватних осіб за
-[Remotion License](https://www.remotion.dev/license)). Що в ньому видно:
+[Remotion License](https://www.remotion.dev/license)). Що в них видно:
 
-| У відео | Автор | Ліцензія |
+| У роликах | Автор | Ліцензія |
 |---|---|---|
 | Шпалери | фото [John Towner](https://unsplash.com/@heytowner) з [Unsplash](https://unsplash.com/photos/JgOeRuGD_Y4) | [Unsplash License](https://unsplash.com/license) |
 | Бар | [DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell) | MIT |
@@ -565,10 +600,10 @@ pzwm запускає їх або спілкується з ними через 
 | Підписи | шрифти [Inter](https://rsms.me/inter/), [JetBrains Mono](https://www.jetbrains.com/lp/mono/) | SIL OFL 1.1 |
 
 Панелі, термінали й логи у відео — макети, зроблені для демо: усі назви,
-числа, хости й адреси в них вигадані. Музики у відео немає.
+числа, хости й адреси в них вигадані. Музики в роликах немає.
 
-Відео © 2026 Максим Шимченко. Його можна поширювати без
-змін із посиланням на цей репозиторій; сторонні елементи в ньому мають
+Ролики © 2026 Максим Шимченко. Їх можна поширювати без
+змін із посиланням на цей репозиторій; сторонні елементи в них мають
 власні ліцензії.
 
 ## Ліцензія

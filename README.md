@@ -1,6 +1,8 @@
 # pzwm - Pan And Zoom Window Manager
 
-https://github.com/user-attachments/assets/c0e63f2d-d8f0-43a3-bd77-575234b23a23
+https://github.com/user-attachments/assets/80dc6676-0ce2-4711-909a-0cd07370d726
+
+<sub>The first of ten short demo clips; the others are in the sections they show: [opening windows](#where-new-windows-open), [ideal size](#size-hints), [minimap and groups](#groups-bookmarks-and-find), [find](#groups-bookmarks-and-find), [drawing and presentation](#drawing-presentation-arrange-semantic-zoom), [settings](#settings-app-pzwm-config), [workspaces](#workspaces-and-the-bar).</sub>
 
 pzwm is a Wayland compositor (window manager) for Linux, written in Rust on
 top of [Smithay](https://github.com/Smithay/smithay). Windows live on one
@@ -241,6 +243,10 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 
 ## Where new windows open
 
+*▶ Opening windows: picking an area, pick mode, windows an app opens itself (67 s)*
+
+https://github.com/user-attachments/assets/2545b96e-a037-4c10-bad6-c860371ea3ec
+
 | Window | Opens |
 |---|---|
 | after you picked an area | filling the area: `Super+O`, then drag a rectangle (Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
@@ -269,6 +275,10 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
   `"awaiting_pick": true`.
 
 ### Size hints
+
+*▶ Fit to the screen and the ideal size (13 s)*
+
+https://github.com/user-attachments/assets/551bd2a2-05af-48ad-8af7-768fea7bd2db
 
 While you drag out an area (`Super+O`, pick mode) or resize a window by
 an edge, the **ideal size** shows as an outline once you get close, and
@@ -456,6 +466,10 @@ launcher (rofi, fuzzel, DMS) and the last two only show up under pzwm.
 
 ## Settings app: pzwm config
 
+*▶ Settings app and desktop profiles (13 s)*
+
+https://github.com/user-attachments/assets/3d4b0605-872e-42a9-958f-d64265e03f3a
+
 Open **pzwm config** from your app launcher, or run `pzwm-config`. It edits
 `~/.config/pzwm/config.toml` with switches, sliders, color pickers and lists.
 
@@ -620,6 +634,10 @@ keeps only the movement that follows the canvas.
 
 ## Workspaces and the bar
 
+*▶ Workspaces (17 s)*
+
+https://github.com/user-attachments/assets/67c46574-3bdd-416f-9a81-e1b22c3bd2a4
+
 There are 10 workspaces. Each monitor shows one; a workspace is shown on
 one monitor at a time, and switching to one that is visible elsewhere swaps
 them.
@@ -728,6 +746,14 @@ pzwm msg profile delete office
 
 ## Groups, bookmarks and find
 
+*▶ Minimap, groups and placement (30 s)*
+
+https://github.com/user-attachments/assets/c7dd4721-93db-42c3-a4ae-c4440ee013f3
+
+*▶ Find a window (10 s)*
+
+https://github.com/user-attachments/assets/925c13e8-2edd-4a59-bff9-b3f961ca5637
+
 - A **group** is the windows sharing a name. Each workspace draws a
   tinted frame around its members, in a color picked from the name.
   *Collapsing* puts the windows away and leaves only the filled frame;
@@ -754,6 +780,14 @@ pzwm msg profile delete office
   can become it with a `scratchpad = true` rule.
 
 ## Drawing, presentation, arrange, semantic zoom
+
+*▶ Drawing on the canvas (19 s)*
+
+https://github.com/user-attachments/assets/797b3ce6-0acd-49f7-ba54-239ba3d6a8a9
+
+*▶ Presentation (21 s)*
+
+https://github.com/user-attachments/assets/e94859a7-0d1c-4bd1-946e-4373adfd7eb1
 
 **Drawing** turns the canvas into a whiteboard: notes and arrows that
 point from one window to another.
@@ -1016,14 +1050,14 @@ separate projects with their own licenses. pzwm starts them or talks to
 them through Wayland protocols and, for the DMS bar, a local socket; it
 does not include their code.
 
-### Demo video
+### Demo clips
 
-[The demo video](https://github.com/user-attachments/assets/c0e63f2d-d8f0-43a3-bd77-575234b23a23) was recorded in pzwm with
+The demo clips in this README were recorded in pzwm with
 [wf-recorder](https://github.com/ammen99/wf-recorder) (MIT) and edited with
 [Remotion](https://www.remotion.dev) (free for individuals under the
-[Remotion License](https://www.remotion.dev/license)). What you see in it:
+[Remotion License](https://www.remotion.dev/license)). What you see in them:
 
-| In the video | By | License |
+| In the clips | By | License |
 |---|---|---|
 | Wallpaper | photo by [John Towner](https://unsplash.com/@heytowner) on [Unsplash](https://unsplash.com/photos/JgOeRuGD_Y4) | [Unsplash License](https://unsplash.com/license) |
 | Bar | [DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell) | MIT |
@@ -1032,12 +1066,12 @@ does not include their code.
 | Captions | [Inter](https://rsms.me/inter/), [JetBrains Mono](https://www.jetbrains.com/lp/mono/) fonts | SIL OFL 1.1 |
 
 The dashboards, terminals and logs in the video are mock-ups made for the
-demo: every name, number, host and address in them is made up. The video
-has no music.
+demo: every name, number, host and address in them is made up. The clips
+have no music.
 
-The video is © 2026 Maksym Shymchenko. You may
-share it unchanged with a link to this repository; the third-party
-elements in it keep their own licenses.
+The clips are © 2026 Maksym Shymchenko. You may
+share them unchanged with a link to this repository; the third-party
+elements in them keep their own licenses.
 
 ## License
 
