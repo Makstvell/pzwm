@@ -2,7 +2,7 @@
 
 https://github.com/user-attachments/assets/80dc6676-0ce2-4711-909a-0cd07370d726
 
-<sub>The first of ten short demo clips; the others are in the sections they show: [opening windows](#where-new-windows-open), [ideal size](#size-hints), [minimap and groups](#groups-bookmarks-and-find), [find](#groups-bookmarks-and-find), [drawing and presentation](#drawing-presentation-arrange-semantic-zoom), [settings](#settings-app-pzwm-config), [workspaces](#workspaces-and-the-bar).</sub>
+<sub>The first of ten short demo clips; the others are in the sections they show: [opening windows](#where-new-windows-open), [ideal size](#size-hints), [pin, snap and tile](#putting-windows-on-the-screen-tile-grid-halves-corners), [minimap and groups](#groups-bookmarks-and-find), [find](#groups-bookmarks-and-find), [drawing and presentation](#drawing-presentation-arrange-semantic-zoom), [settings](#settings-app-pzwm-config), [workspaces](#workspaces-and-the-bar).</sub>
 
 pzwm is a Wayland compositor (window manager) for Linux, written in Rust on
 top of [Smithay](https://github.com/Smithay/smithay). Windows live on one
@@ -324,6 +324,10 @@ Windows whose tops are within half a window of each other count as one
 row. From scripts: `pzwm msg window 12`.
 
 ## Putting windows on the screen: tile grid, halves, corners
+
+*▶ Pin, snap to halves and thirds, tile grid (27 s)*
+
+https://github.com/user-attachments/assets/bb9c0e4c-f5f6-46e9-b597-f43bf5584286
 
 The windows still live on the canvas; these place one on part of what the
 screen shows. So that the result does not depend on how far you zoomed,
