@@ -56,6 +56,9 @@ pub struct AreaState {
     pub window: Option<u64>,
     /// Windows still waiting for their place, oldest first.
     pub waiting: Vec<u64>,
+    /// Windows of the current run of waiting ones placed so far, for
+    /// "2 of 3"; back to 0 once none waits.
+    pub placed: usize,
     /// When the user launched something whose window has not come yet.
     pub launches: Vec<Instant>,
 }
@@ -179,6 +182,27 @@ pub fn insert_beside(
     (loc.into(), moves)
 }
 
+/// Notification title while picking: the app, and "2 of 3" when several
+/// windows wait.
+pub fn pick_title(app: &str, number: usize, after: usize) -> String {
+    let total = number + after;
+    if total > 1 {
+        format!("Place {app} · {number} of {total}")
+    } else {
+        format!("Place {app}")
+    }
+}
+
+/// Notification body: the keys, then the apps still waiting.
+pub fn pick_body(rest: &[String]) -> String {
+    let keys =
+        "Drag out its area · Enter, arrows or h j k l: beside the focused window · Esc: the middle";
+    if rest.is_empty() {
+        return keys.into();
+    }
+    format!("{keys}\nNext: {}", rest.join(", "))
+}
+
 /// Parses `X,Y WxH` (canvas units) for `area rect`.
 fn parse_rect(arg: &str) -> Option<Rectangle<f64, Logical>> {
     let (pos, size) = arg.trim().split_once(char::is_whitespace)?;
@@ -288,6 +312,10 @@ impl State {
 
     /// "pick" mode: a new window waits for its place instead of opening.
     pub fn wait_for_pick(&mut self, idx: usize) {
+        // A new run of waiting windows counts from 1 again.
+        if self.area.window.is_none() && self.area.waiting.is_empty() {
+            self.area.placed = 0;
+        }
         self.windows[idx].awaiting_pick = true;
         self.area.waiting.push(self.windows[idx].id);
         self.pick_next_window();
@@ -299,6 +327,13 @@ impl State {
         if self.area.selecting {
             return;
         }
+        let any_waiting = self.area.waiting.iter().any(|&w| {
+            self.index_of_id(w)
+                .is_some_and(|i| self.windows[i].awaiting_pick)
+        });
+        if !any_waiting {
+            self.area.placed = 0;
+        }
         while !self.area.waiting.is_empty() {
             let id = self.area.waiting.remove(0);
             let Some(idx) = self
@@ -307,7 +342,16 @@ impl State {
             else {
                 continue;
             };
-            let app = self.app_id(&self.windows[idx]).unwrap_or_default();
+            let app = crate::icons::app_name(&self.app_id(&self.windows[idx]).unwrap_or_default());
+            // The ones still waiting after this one, by app.
+            let rest: Vec<String> = self
+                .area
+                .waiting
+                .iter()
+                .filter_map(|&w| self.index_of_id(w))
+                .filter(|&i| self.windows[i].awaiting_pick)
+                .map(|i| crate::icons::app_name(&self.app_id(&self.windows[i]).unwrap_or_default()))
+                .collect();
             self.area.window = Some(id);
             self.area.selecting = true;
             self.cursor_override = Some(CursorIcon::Crosshair);
@@ -315,8 +359,8 @@ impl State {
             self.spawn(&format!(
                 "notify-send -a pzwm -t 4000 \
                  -h string:x-canonical-private-synchronous:pzwm-pick {} {}",
-                quote(&format!("Place {app}")),
-                quote("Drag out its area · Enter, arrows or h j k l: beside the focused window · Esc: the middle"),
+                quote(&pick_title(&app, self.area.placed + 1, rest.len())),
+                quote(&pick_body(&rest)),
             ));
             self.queue_redraw_all();
             return;
@@ -329,6 +373,7 @@ impl State {
         let Some(idx) = self.index_of_id(id) else {
             return;
         };
+        self.area.placed += 1;
         let title = self.title_height(&self.windows[idx]);
         let m = &mut self.windows[idx];
         m.awaiting_pick = false;
@@ -830,6 +875,14 @@ mod tests {
         assert_eq!(p, Point::from((0.0, -520.0)));
         // The window above moves up by the new window's height and gap.
         assert_eq!(moves, vec![(1, Point::from((0.0, -520.0)))]);
+    }
+
+    #[test]
+    fn the_notification_counts_waiting_windows() {
+        assert_eq!(pick_title("Ghostty", 1, 0), "Place Ghostty");
+        assert_eq!(pick_title("Ghostty", 2, 1), "Place Ghostty · 2 of 3");
+        assert!(pick_body(&[]).starts_with("Drag out its area"));
+        assert!(pick_body(&["Firefox".into(), "Files".into()]).ends_with("Next: Firefox, Files"));
     }
 
     #[test]

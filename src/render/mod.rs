@@ -9,6 +9,7 @@
 mod drawings;
 mod group_frames;
 mod parallax;
+mod pick_badge;
 mod semantic;
 pub mod shaders;
 
@@ -117,6 +118,11 @@ pub struct RenderCache {
     drawings: HashMap<(String, u64, usize), ShaderElement>,
     /// Semantic-zoom cards by window id.
     cards: HashMap<u64, ShaderElement>,
+    /// The card at the cursor while windows wait for their place: 0 is the
+    /// card, 1.. the dots.
+    badge: HashMap<usize, ShaderElement>,
+    /// Ids of the miniature in that card, by the surface element it copies.
+    badge_thumbs: HashMap<Id, Id>,
 }
 
 impl RenderCache {
@@ -167,6 +173,9 @@ pub fn scaled_output_elements<R: PzRenderer>(
     let mut out: Vec<PzElement<R>> = Vec::new();
 
     cursor_elements(state, renderer, output, os, &mut out);
+    if let Some(sh) = shaders.as_ref() {
+        pick_badge::badge_elements(state, renderer, output, os, sh, &mut out);
+    }
 
     if state.lock.is_locked() {
         if let Some(lock) = state.lock_surfaces.get(&output.name()) {
