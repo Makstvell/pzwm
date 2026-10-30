@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Groups: named sets of canvas windows that belong together, drawn as a
 //! tinted frame around them like a Figma frame.
 //!

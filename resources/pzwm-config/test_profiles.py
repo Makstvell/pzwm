@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Maksym Shymchenko (Makstvell)
+
 """Tests for the Profiles page helpers."""
 
 import json

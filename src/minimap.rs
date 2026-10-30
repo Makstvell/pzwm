@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! The minimap: a small map of the whole workspace with a live preview of
 //! every canvas window and the visible area, so nothing gets lost on the
 //! infinite canvas. It either sits in a screen corner or, with

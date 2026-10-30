@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Monitor changes while running: listing every connected monitor for
 //! output management, re-applying `[[output]]` settings without replugging,
 //! and gamma ramps (night light).

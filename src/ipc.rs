@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! `pzwm msg …`: a line-based unix socket for scripts and bars.
 //!
 //! Requests are one line: any bind action (`workspace 3`, `zoom-in`,

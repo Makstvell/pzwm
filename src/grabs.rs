@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Pointer interactions owned by the compositor: panning the canvas, moving
 //! and resizing windows. They run as a smithay pointer grab so clients see no
 //! input while the drag lasts.

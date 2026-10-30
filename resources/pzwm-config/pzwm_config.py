@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Maksym Shymchenko (Makstvell)
 """pzwm config: a settings app for ~/.config/pzwm/config.toml.
 
 Edits keep the file's comments and order (see tomlpatch.py). Saving checks

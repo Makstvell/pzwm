@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Maksym Shymchenko (Makstvell)
+
 """The options pzwm config can edit, grouped into pages.
 
 Defaults come from `pzwm --print-default-config`; this file only adds

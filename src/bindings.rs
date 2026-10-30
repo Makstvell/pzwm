@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Keyboard: key bindings (matched in every layout), the action
 //! dispatcher and config reload.
 

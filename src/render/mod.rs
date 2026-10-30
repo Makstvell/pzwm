@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Builds the element list for one output, front to back:
 //! cursor → lock screen → overlay layer → fullscreen → bar (top layer) →
 //! minimap → snap preview → windows with their frames → group frames →

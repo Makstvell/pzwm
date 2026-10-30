@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Maksym Shymchenko (Makstvell)
+
 """Line-based edits of a TOML file that keep comments, order and spacing.
 
 Only what pzwm's config needs: plain `[table]` sections, `[[output]]`

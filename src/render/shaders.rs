@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! GLSL shaders for everything pzwm draws itself: the canvas grid, window
 //! frames (shadow, gradient border, titlebar, buttons), the snap preview, and
 //! the rounded-corner clip applied to client surfaces.

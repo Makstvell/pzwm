@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Maksym Shymchenko (Makstvell)
+
 """The Profiles page: save, load, rename and delete desktop profiles.
 
 Unlike the other pages it does not edit config.toml: every button talks

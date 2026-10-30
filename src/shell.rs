@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Window management on the canvas: placement, focus, maximize/fullscreen
 //! with restore, pinning, snapping, workspaces and hit testing.
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! App icons for semantic zoom: app id → `.desktop` file → `Icon=` →
 //! a PNG in the hicolor theme or `pixmaps`. Looked up once per app and
 //! kept; SVG-only icons are not decoded (the card shows without one).

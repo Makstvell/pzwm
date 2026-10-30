@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Desktop profiles: named snapshots of where applications sit.
 //!
 //! `profile save work` records every canvas or maximized window (by app id)

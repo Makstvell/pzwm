@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Native backend: DRM/KMS outputs, libinput devices and a libseat session.
 //! (Kept as one file on purpose: device, output and frame-pacing code share
 //! private types and read best together.)

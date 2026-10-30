@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Drawing on the canvas: freehand notes and arrows between windows, like
 //! on a whiteboard. Strokes live in canvas coordinates, so they pan and
 //! zoom with the windows, and are kept per workspace in

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Maksym Shymchenko (Makstvell)
+
 """Tests for tomlpatch: run `python3 -m unittest` in this directory."""
 
 import tomllib

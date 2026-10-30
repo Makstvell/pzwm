@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! wlr-output-management: monitor settings from other programs (kanshi
 //! profiles, wdisplays, wlr-randr, nwg-displays). A configuration a client
 //! applies becomes a runtime override of `[[output]]` (state.rs) and takes

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! wlr-gamma-control: lets night-light tools (wlsunset, gammastep) tint
 //! the screen by setting each monitor's gamma ramp. Works on a TTY
 //! session; the ramp goes back to linear when the tool exits.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Scratchpad: one drop-down window (a terminal by default) that the
 //! `scratchpad` action calls up at the top of the screen and puts away
 //! again. It is started on first use by `[scratchpad] command`.

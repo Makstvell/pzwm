@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Maksym Shymchenko (Makstvell)
 # Installs pzwm build and runtime dependencies with the distro package manager.
 set -euo pipefail
 

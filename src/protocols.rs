@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Smaller Wayland protocols that need little more than their global:
 //! input methods (fcitx5 and other IMEs: text-input-v3, input-method-v2,
 //! virtual-keyboard), xdg-dialog, xdg-foreign (portal dialogs over the

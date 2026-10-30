@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Wallpaper parallax: the background layer is zoomed in a little, shifts
 //! against the camera while the canvas is panned and, with `swing`, drifts
 //! slowly left and right on its own.

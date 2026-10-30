@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! The infinite canvas: camera math, short camera animations and the
 //! magnetic edge snapping used while dragging windows.
 //!

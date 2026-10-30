@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! XCursor theme loading with a per-(name, size) cache.
 
 use std::collections::HashMap;

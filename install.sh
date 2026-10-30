@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Maksym Shymchenko (Makstvell)
 # Build and install pzwm.
 #
 #   ./install.sh                 build + install to /usr/local (asks for sudo)

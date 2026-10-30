@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! User configuration: `~/.config/pzwm/config.toml`.
 //!
 //! Every field has a default, so an empty file (or no file at all) gives a

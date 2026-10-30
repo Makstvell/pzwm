@@ -19,7 +19,7 @@ line some up on a grid over the screen when you want to (`Super+T`).
 | **Runs on** | Linux, from a login manager or a TTY; `--nested` inside another desktop |
 | **Config** | `~/.config/pzwm/config.toml`, or the **pzwm config** app |
 | **Status** | Personal project, version 0.1, used daily |
-| **License** | GPL-2.0-or-later |
+| **License** | Apache-2.0 |
 
 ### Two ways to open windows
 
@@ -999,7 +999,7 @@ pzwm is built on these open-source projects. Thank you to their authors.
 **Every Rust library** pzwm is compiled with, with its version and
 license, is listed in [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md). They use
 permissive licenses (MIT, Apache-2.0, BSD, ISC, Zlib, Unicode, Unlicense)
-that allow use in a GPL program. This repository does not include their
+that are compatible with pzwm's Apache-2.0. This repository does not include their
 source code; Cargo downloads it when you build.
 
 **System libraries** pzwm links to at run time, installed by your
@@ -1043,13 +1043,16 @@ elements in them keep their own licenses.
 
 ## License
 
-Copyright © 2026 Maksym Shymchenko ([Makstvell](https://github.com/Makstvell))
+Copyright 2026 Maksym Shymchenko ([Makstvell](https://github.com/Makstvell))
 
-pzwm is free software under the **GNU General Public License, version 2
-or (at your option) any later version** (GPL-2.0-or-later). See
-[LICENSE](LICENSE).
+pzwm is licensed under the **[Apache License, Version 2.0](LICENSE)**.
 
-A few of the libraries pzwm is compiled with (winit, gethostname, cgmath,
-approx) are Apache-2.0 only, which is compatible with GPL version 3
-but not with version 2. So a compiled pzwm binary is distributed under
-GPL-3.0-or-later; the source in this repository stays GPL-2.0-or-later.
+You may use, change and share pzwm, also in commercial and closed-source
+products. If you share pzwm or a work based on it, you must:
+
+- include a copy of the [LICENSE](LICENSE);
+- keep the [NOTICE](NOTICE) file, which credits the author;
+- keep the copyright and license notices at the top of the source files;
+- mark the files you changed.
+
+pzwm comes without any warranty.

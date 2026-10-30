@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Window lists for taskbars and docks.
 //!
 //! Two protocols describe the open windows to other programs:

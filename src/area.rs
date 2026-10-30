@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Where new windows go besides the middle of the view:
 //! - an **area** the user drags out on the canvas (`area`, Super+O, or
 //!   Super+Ctrl + left drag): the next window that opens fills it;

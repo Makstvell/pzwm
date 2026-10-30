@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Moving around: camera (pan, zoom, overview, centering), focus by
 //! direction or cycling, half-screen tiling and workspaces.
 

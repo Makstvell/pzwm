@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! wlr-screencopy (shm buffers): lets `grim`, `slurp`-based screenshots and
 //! screen recorders capture pzwm outputs. Copies asked through
 //! ext-image-copy-capture (image_copy.rs) are served here too.

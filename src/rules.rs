@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Window rules: `[[rule]]` blocks in the config that pick where and how a
 //! window opens, matched on its app id and title.
 //!

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Drawings on the canvas (see draw.rs): one round-capped line element per
 //! segment, above the windows so notes and arrows can point at them.
 

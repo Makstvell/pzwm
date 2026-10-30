@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Workspace feed for bars.
 //!
 //! Speaks the JSON-lines protocol DankMaterialShell uses for the Umbriel

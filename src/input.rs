@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Pointer and touchpad input: focus, canvas gestures, window dragging.
 //! Keyboard handling lives in `bindings.rs`.
 

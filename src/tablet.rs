@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Drawing tablets and pens (tablet-v2): the pen moves the cursor like a
 //! mouse and apps that understand tablets (Krita, GIMP, Xournal++) get
 //! pressure, tilt and the pen buttons.

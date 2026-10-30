@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Size hints while a window's size is chosen (dragging out an area,
 //! resizing): "ideal" sizes pull the size in when it comes near and show
 //! as an outline before that. The main one is the whole screen at 100 %

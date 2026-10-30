@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Group frames: a tinted rounded rectangle behind each group's windows,
 //! filled stronger while the group is collapsed.
 

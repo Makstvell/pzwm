@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Camera jumps: a back/forward history like a browser's and named
 //! bookmarks of camera spots, both per workspace.
 //!

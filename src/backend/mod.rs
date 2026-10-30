@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Display/input backends: `udev` (real session on a TTY) and `winit`
 //! (a window inside another compositor, for testing).
 

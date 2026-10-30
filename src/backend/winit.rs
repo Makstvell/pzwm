@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Nested backend: pzwm runs in a window of the current compositor.
 //! Handy for trying the config without leaving your session.
 

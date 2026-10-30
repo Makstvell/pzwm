@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Maksym Shymchenko (Makstvell)
 # Login entry for pzwm: display managers start this through pzwm.desktop,
 # or run it yourself from a TTY.
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! On-demand layouts: `arrange grid|row|column` lines up the focused
 //! window's group (or, outside a group, every canvas window of the
 //! workspace) once and fits the camera to the result. Tiling stays an

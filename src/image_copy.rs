@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! ext-image-copy-capture-v1 with ext-image-capture-source-v1 for outputs:
 //! the capture protocol xdg-desktop-portal-wlr prefers for screen sharing
 //! (its wlr-screencopy path in 0.8.4 stalls after the first frame). A

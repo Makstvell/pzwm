@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Actions that key bindings can trigger, parsed from strings like
 //! `"spawn ghostty"`, `"workspace 3"` or `"pan left"`.
 

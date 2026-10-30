@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Semantic zoom: below `[canvas] semantic_zoom` the unreadable miniature
 //! of each window fades into a card in its app's color with the app icon
 //! in the middle, so a zoomed-out canvas reads like a map of apps.

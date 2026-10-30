@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! `find`: search windows, groups and bookmarks by name and fly there.
 //!
 //! pzwm draws no text, so the list is shown by a dmenu-style picker (rofi,

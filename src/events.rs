@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Event stream for scripts: `pzwm msg subscribe` keeps the connection open
 //! and gets one JSON object per line whenever something changes:
 //!

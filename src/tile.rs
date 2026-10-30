@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Putting a window on part of the screen, beyond plain halves:
 //! - `tile` (Super+T): a grid over the screen; drag across the cells (or
 //!   move with the arrows, grow with Shift+arrows, Enter) and the focused

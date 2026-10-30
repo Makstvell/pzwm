@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Window numbers for `window N` and Super+1 … 9, 0: counted by place on
 //! the canvas (top-left first, by default) or in the order windows opened,
 //! see `[general] window_numbers`. Holding Super and typing more digits

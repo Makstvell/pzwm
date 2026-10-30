@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Presentation mode: `present` walks the camera through the bookmarks of
 //! the current workspace, one slide each, like a Prezi or a Figma
 //! prototype. Bookmarks named with numbers come first, in number order,

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Maksym Shymchenko (Makstvell)
+
 //! Wayland protocol handlers: thin glue between smithay and `State`.
 
 use std::os::fd::OwnedFd;
