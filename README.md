@@ -1,8 +1,44 @@
 # pzwm - Pan And Zoom Window Manager
 
+**1. Pan and zoom**
+
 https://github.com/user-attachments/assets/80dc6676-0ce2-4711-909a-0cd07370d726
 
-<sub>The first of ten short demo clips; the others are in the sections they show: [opening windows](#where-new-windows-open), [ideal size](#size-hints), [pin, snap and tile](#putting-windows-on-the-screen-tile-grid-halves-corners), [minimap and groups](#groups-bookmarks-and-find), [find](#groups-bookmarks-and-find), [drawing and presentation](#drawing-presentation-arrange-semantic-zoom), [settings](#settings-app-pzwm-config), [workspaces](#workspaces-and-the-bar).</sub>
+**2. Opening windows**
+
+https://github.com/user-attachments/assets/2545b96e-a037-4c10-bad6-c860371ea3ec
+
+**3. Fit and ideal size**
+
+https://github.com/user-attachments/assets/551bd2a2-05af-48ad-8af7-768fea7bd2db
+
+**4. Minimap, groups, placement**
+
+https://github.com/user-attachments/assets/c7dd4721-93db-42c3-a4ae-c4440ee013f3
+
+**5. Presentation**
+
+https://github.com/user-attachments/assets/e94859a7-0d1c-4bd1-946e-4373adfd7eb1
+
+**6. Pin, snap, tile**
+
+https://github.com/user-attachments/assets/bb9c0e4c-f5f6-46e9-b597-f43bf5584286
+
+**7. Find**
+
+https://github.com/user-attachments/assets/925c13e8-2edd-4a59-bff9-b3f961ca5637
+
+**8. Draw on the canvas**
+
+https://github.com/user-attachments/assets/797b3ce6-0acd-49f7-ba54-239ba3d6a8a9
+
+**9. Settings and profiles**
+
+https://github.com/user-attachments/assets/3d4b0605-872e-42a9-958f-d64265e03f3a
+
+**10. Workspaces**
+
+https://github.com/user-attachments/assets/67c46574-3bdd-416f-9a81-e1b22c3bd2a4
 
 pzwm is a Wayland compositor (window manager) for Linux, written in Rust on
 top of [Smithay](https://github.com/Smithay/smithay). Windows live on one
@@ -243,10 +279,6 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 
 ## Where new windows open
 
-*▶ Opening windows: picking an area, pick mode, windows an app opens itself (67 s)*
-
-https://github.com/user-attachments/assets/2545b96e-a037-4c10-bad6-c860371ea3ec
-
 | Window | Opens |
 |---|---|
 | after you picked an area | filling the area: `Super+O`, then drag a rectangle (Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
@@ -275,10 +307,6 @@ https://github.com/user-attachments/assets/2545b96e-a037-4c10-bad6-c860371ea3ec
   `"awaiting_pick": true`.
 
 ### Size hints
-
-*▶ Fit to the screen and the ideal size (13 s)*
-
-https://github.com/user-attachments/assets/551bd2a2-05af-48ad-8af7-768fea7bd2db
 
 While you drag out an area (`Super+O`, pick mode) or resize a window by
 an edge, the **ideal size** shows as an outline once you get close, and
@@ -324,10 +352,6 @@ Windows whose tops are within half a window of each other count as one
 row. From scripts: `pzwm msg window 12`.
 
 ## Putting windows on the screen: tile grid, halves, corners
-
-*▶ Pin, snap to halves and thirds, tile grid (27 s)*
-
-https://github.com/user-attachments/assets/bb9c0e4c-f5f6-46e9-b597-f43bf5584286
 
 The windows still live on the canvas; these place one on part of what the
 screen shows. So that the result does not depend on how far you zoomed,
@@ -469,10 +493,6 @@ launcher (rofi, fuzzel, DMS) and the last two only show up under pzwm.
 `shortcuts`, …). If the app is already open, it switches to that page.
 
 ## Settings app: pzwm config
-
-*▶ Settings app and desktop profiles (13 s)*
-
-https://github.com/user-attachments/assets/3d4b0605-872e-42a9-958f-d64265e03f3a
 
 Open **pzwm config** from your app launcher, or run `pzwm-config`. It edits
 `~/.config/pzwm/config.toml` with switches, sliders, color pickers and lists.
@@ -638,10 +658,6 @@ keeps only the movement that follows the canvas.
 
 ## Workspaces and the bar
 
-*▶ Workspaces (17 s)*
-
-https://github.com/user-attachments/assets/67c46574-3bdd-416f-9a81-e1b22c3bd2a4
-
 There are 10 workspaces. Each monitor shows one; a workspace is shown on
 one monitor at a time, and switching to one that is visible elsewhere swaps
 them.
@@ -750,14 +766,6 @@ pzwm msg profile delete office
 
 ## Groups, bookmarks and find
 
-*▶ Minimap, groups and placement (30 s)*
-
-https://github.com/user-attachments/assets/c7dd4721-93db-42c3-a4ae-c4440ee013f3
-
-*▶ Find a window (10 s)*
-
-https://github.com/user-attachments/assets/925c13e8-2edd-4a59-bff9-b3f961ca5637
-
 - A **group** is the windows sharing a name. Each workspace draws a
   tinted frame around its members, in a color picked from the name.
   *Collapsing* puts the windows away and leaves only the filled frame;
@@ -784,14 +792,6 @@ https://github.com/user-attachments/assets/925c13e8-2edd-4a59-bff9-b3f961ca5637
   can become it with a `scratchpad = true` rule.
 
 ## Drawing, presentation, arrange, semantic zoom
-
-*▶ Drawing on the canvas (19 s)*
-
-https://github.com/user-attachments/assets/797b3ce6-0acd-49f7-ba54-239ba3d6a8a9
-
-*▶ Presentation (21 s)*
-
-https://github.com/user-attachments/assets/e94859a7-0d1c-4bd1-946e-4373adfd7eb1
 
 **Drawing** turns the canvas into a whiteboard: notes and arrows that
 point from one window to another.
