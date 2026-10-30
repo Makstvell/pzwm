@@ -1,8 +1,6 @@
 # pzwm - Pan And Zoom Window Manager
 
-<a href="docs/pzwm-demo.mp4"><img src="docs/pzwm-demo.jpg" alt="pzwm demo video" width="100%"></a>
-
-<p align="center"><b><a href="docs/pzwm-demo.mp4">▶ Watch the demo video (3:54)</a></b>: panning and zooming, opening windows, tiling, find, drawing, profiles</p>
+https://github.com/user-attachments/assets/c0e63f2d-d8f0-43a3-bd77-575234b23a23
 
 pzwm is a Wayland compositor (window manager) for Linux, written in Rust on
 top of [Smithay](https://github.com/Smithay/smithay). Windows live on one
@@ -1020,7 +1018,7 @@ does not include their code.
 
 ### Demo video
 
-[docs/pzwm-demo.mp4](docs/pzwm-demo.mp4) was recorded in pzwm with
+[The demo video](https://github.com/user-attachments/assets/c0e63f2d-d8f0-43a3-bd77-575234b23a23) was recorded in pzwm with
 [wf-recorder](https://github.com/ammen99/wf-recorder) (MIT) and edited with
 [Remotion](https://www.remotion.dev) (free for individuals under the
 [Remotion License](https://www.remotion.dev/license)). What you see in it:
@@ -1037,9 +1035,9 @@ The dashboards, terminals and logs in the video are mock-ups made for the
 demo: every name, number, host and address in them is made up. The video
 has no music.
 
-The video and its poster image are © 2026 Maksym Shymchenko. You may
-share them unchanged with a link to this repository; the third-party
-elements in them keep their own licenses.
+The video is © 2026 Maksym Shymchenko. You may
+share it unchanged with a link to this repository; the third-party
+elements in it keep their own licenses.
 
 ## License
 
