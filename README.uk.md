@@ -7,7 +7,9 @@
 
 [English →](README.md)
 
-![pzwm](docs/screenshot.png)
+<a href="docs/pzwm-demo.mp4"><img src="docs/pzwm-demo.jpg" alt="Демо-відео pzwm" width="100%"></a>
+
+<p align="center"><b><a href="docs/pzwm-demo.mp4">▶ Дивитись демо-відео (3:54)</a></b>: рух і зум, відкриття вікон, розкладка, пошук, малювання, профілі (англійською)</p>
 
 ### Два режими відкриття вікон
 
@@ -510,6 +512,75 @@ hicolor (лише PNG; програми тільки з SVG-іконкою от�
 | Демонстрація екрана (Discord, браузер) показує одну нерухому картинку або нічого | Виправлено: pzwm тепер підтримує ext-image-copy-capture, тож xdg-desktop-portal-wlr не йде старим шляхом wlr-screencopy, який у версії 0.8.4 зупиняється після першого кадру (issue #411); кадри ще й у форматі XRGB8888, який просять клієнти PipeWire. Перезібрати й перелогінитись. Перевірка: `journalctl --user -u xdg-desktop-portal-wlr` має показати `using ext_image_copy_capture` |
 | У DMS-барі немає іконок трею | Додай віджет **System Tray** (налаштування DMS → Widgets) або `{"id": "systemTray", "enabled": true}` у `rightWidgets` файла `~/.config/DankMaterialShell/settings.json`. Програми, що згортаються в трей (Discord, Telegram), будуть там |
 
+## Подяки
+
+pzwm побудований на відкритих проєктах. Дякую їхнім авторам.
+
+| Проєкт | Для чого | Ліцензія |
+|---|---|---|
+| [Smithay](https://github.com/Smithay/smithay) | основа композитора | MIT |
+| [smithay-drm-extras](https://github.com/Smithay/smithay) | інформація про монітори | MIT |
+| [calloop](https://github.com/Smithay/calloop) | цикл подій | MIT |
+| [winit](https://github.com/rust-windowing/winit) | режим `--nested` | Apache-2.0 |
+| [serde](https://github.com/serde-rs/serde), [toml](https://github.com/toml-rs/toml) | читання конфігу | MIT або Apache-2.0 |
+| [serde_json](https://github.com/serde-rs/json) | профілі, дані для бару | MIT або Apache-2.0 |
+| [png](https://github.com/image-rs/image-png) | іконки програм для семантичного зуму | MIT або Apache-2.0 |
+| [tracing](https://github.com/tokio-rs/tracing) | логи | MIT |
+| [anyhow](https://github.com/dtolnay/anyhow) | помилки | MIT або Apache-2.0 |
+| [xcursor](https://github.com/esposm03/xcursor-rs) | теми курсора | MIT |
+
+**Усі Rust-бібліотеки**, з якими компілюється pzwm, з версіями й
+ліцензіями, перелічені в [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md). Їхні
+ліцензії дозвільні (MIT, Apache-2.0, BSD, ISC, Zlib, Unicode, Unlicense) і
+дозволяють використання в GPL-програмі. Їхнього коду в репозиторії немає:
+Cargo завантажує його під час збирання.
+
+**Системні бібліотеки**, до яких pzwm під'єднується під час роботи (їх
+ставить дистрибутив, тут їх немає): libinput, libseat, libdrm,
+libxkbcommon, GBM і EGL з Mesa (MIT і подібні) та libudev із systemd
+(LGPL-2.1-or-later).
+
+**Програма налаштувань** (`pzwm config`) написана на Python і використовує
+[PyGObject](https://gitlab.gnome.org/GNOME/pygobject), [GTK 4](https://gtk.org)
+та [libadwaita](https://gitlab.gnome.org/GNOME/libadwaita)
+(LGPL-2.1-or-later); їх ставить дистрибутив, тут їх немає.
+
+**Інші програми** (DMS, waybar, xwayland-satellite,
+xdg-desktop-portal-wlr, grim тощо) — окремі проєкти зі своїми ліцензіями.
+pzwm запускає їх або спілкується з ними через протоколи Wayland, а з
+баром DMS — через локальний сокет; їхнього коду pzwm не містить.
+
+### Демо-відео
+
+[docs/pzwm-demo.mp4](docs/pzwm-demo.mp4) записане в pzwm за допомогою
+[wf-recorder](https://github.com/ammen99/wf-recorder) (MIT) і змонтоване в
+[Remotion](https://www.remotion.dev) (безкоштовно для приватних осіб за
+[Remotion License](https://www.remotion.dev/license)). Що в ньому видно:
+
+| У відео | Автор | Ліцензія |
+|---|---|---|
+| Шпалери | фото [John Towner](https://unsplash.com/@heytowner) з [Unsplash](https://unsplash.com/photos/JgOeRuGD_Y4) | [Unsplash License](https://unsplash.com/license) |
+| Бар | [DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell) | MIT |
+| Курсор | [Bibata](https://github.com/ful1e5/Bibata_Cursor) | GPL-3.0 |
+| Термінал, інфо про систему | [Ghostty](https://ghostty.org), [fastfetch](https://github.com/fastfetch-cli/fastfetch) | MIT |
+| Підписи | шрифти [Inter](https://rsms.me/inter/), [JetBrains Mono](https://www.jetbrains.com/lp/mono/) | SIL OFL 1.1 |
+
+Панелі, термінали й логи у відео — макети, зроблені для демо: усі назви,
+числа, хости й адреси в них вигадані. Музики у відео немає.
+
+Відео та його обкладинка © 2026 Максим Шимченко. Їх можна поширювати без
+змін із посиланням на цей репозиторій; сторонні елементи в них мають
+власні ліцензії.
+
 ## Ліцензія
 
-GPL-2.0-or-later, див. [LICENSE](LICENSE).
+Copyright © 2026 Максим Шимченко ([Makstvell](https://github.com/Makstvell))
+
+pzwm — вільне програмне забезпечення під **GNU General Public License
+версії 2 або (на ваш вибір) будь-якої пізнішої** (GPL-2.0-or-later). Див.
+[LICENSE](LICENSE).
+
+Кілька бібліотек, з якими компілюється pzwm (winit, gethostname, cgmath,
+approx), мають лише Apache-2.0, а вона сумісна з GPL версії 3, але не 2.
+Тому зібраний бінарний файл pzwm поширюється під GPL-3.0-or-later;
+вихідний код у репозиторії лишається GPL-2.0-or-later.

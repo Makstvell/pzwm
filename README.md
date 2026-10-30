@@ -1,6 +1,8 @@
 # pzwm - Pan And Zoom Window Manager
 
-![pzwm](docs/screenshot.png)
+<a href="docs/pzwm-demo.mp4"><img src="docs/pzwm-demo.jpg" alt="pzwm demo video" width="100%"></a>
+
+<p align="center"><b><a href="docs/pzwm-demo.mp4">▶ Watch the demo video (3:54)</a></b>: panning and zooming, opening windows, tiling, find, drawing, profiles</p>
 
 pzwm is a Wayland compositor (window manager) for Linux, written in Rust on
 top of [Smithay](https://github.com/Smithay/smithay). Windows live on one
@@ -993,20 +995,61 @@ pzwm is built on these open-source projects. Thank you to their authors.
 | [tracing](https://github.com/tokio-rs/tracing) | logs | MIT |
 | [anyhow](https://github.com/dtolnay/anyhow) | errors | MIT or Apache-2.0 |
 | [xcursor](https://github.com/esposm03/xcursor-rs) | cursor themes | MIT |
-| [PyGObject](https://gitlab.gnome.org/GNOME/pygobject), [GTK](https://gtk.org), [libadwaita](https://gitlab.gnome.org/GNOME/libadwaita) | the pzwm config app (used, not included) | LGPL-2.1-or-later |
 
-All other Rust libraries pzwm uses are listed in [`Cargo.lock`](Cargo.lock).
-Their licenses (MIT, Apache-2.0, BSD, ISC, Zlib and similar) all allow
-use in a GPL program. pzwm does not include their source code; Cargo
-downloads it when you build.
+**Every Rust library** pzwm is compiled with, with its version and
+license, is listed in [docs/THIRD-PARTY.md](docs/THIRD-PARTY.md). They use
+permissive licenses (MIT, Apache-2.0, BSD, ISC, Zlib, Unicode, Unlicense)
+that allow use in a GPL program. This repository does not include their
+source code; Cargo downloads it when you build.
 
-The programs in [Works with](#works-with) (DMS, waybar, xwayland-satellite
-and others) are separate projects with their own licenses. pzwm only talks
-to them through Wayland protocols and, for the DMS bar, a local socket; it
+**System libraries** pzwm links to at run time, installed by your
+distribution, not included here: libinput, libseat, libdrm, libxkbcommon,
+Mesa's GBM and EGL (MIT and similar), and libudev from systemd
+(LGPL-2.1-or-later).
+
+**The settings app** (`pzwm config`) is Python and uses
+[PyGObject](https://gitlab.gnome.org/GNOME/pygobject), [GTK 4](https://gtk.org)
+and [libadwaita](https://gitlab.gnome.org/GNOME/libadwaita)
+(LGPL-2.1-or-later), installed by your distribution, not included here.
+
+**Other programs.** The programs in [Works with](#works-with) (DMS,
+waybar, xwayland-satellite, xdg-desktop-portal-wlr, grim and others) are
+separate projects with their own licenses. pzwm starts them or talks to
+them through Wayland protocols and, for the DMS bar, a local socket; it
 does not include their code.
+
+### Demo video
+
+[docs/pzwm-demo.mp4](docs/pzwm-demo.mp4) was recorded in pzwm with
+[wf-recorder](https://github.com/ammen99/wf-recorder) (MIT) and edited with
+[Remotion](https://www.remotion.dev) (free for individuals under the
+[Remotion License](https://www.remotion.dev/license)). What you see in it:
+
+| In the video | By | License |
+|---|---|---|
+| Wallpaper | photo by [John Towner](https://unsplash.com/@heytowner) on [Unsplash](https://unsplash.com/photos/JgOeRuGD_Y4) | [Unsplash License](https://unsplash.com/license) |
+| Bar | [DankMaterialShell](https://github.com/AvengeMedia/DankMaterialShell) | MIT |
+| Cursor | [Bibata](https://github.com/ful1e5/Bibata_Cursor) | GPL-3.0 |
+| Terminal, system info | [Ghostty](https://ghostty.org), [fastfetch](https://github.com/fastfetch-cli/fastfetch) | MIT |
+| Captions | [Inter](https://rsms.me/inter/), [JetBrains Mono](https://www.jetbrains.com/lp/mono/) fonts | SIL OFL 1.1 |
+
+The dashboards, terminals and logs in the video are mock-ups made for the
+demo: every name, number, host and address in them is made up. The video
+has no music.
+
+The video and its poster image are © 2026 Maksym Shymchenko. You may
+share them unchanged with a link to this repository; the third-party
+elements in them keep their own licenses.
 
 ## License
 
+Copyright © 2026 Maksym Shymchenko ([Makstvell](https://github.com/Makstvell))
+
 pzwm is free software under the **GNU General Public License, version 2
-or (at your option) any later version** (GPL-2.0-or-later), the same family
-of license as the Linux kernel. See [LICENSE](LICENSE).
+or (at your option) any later version** (GPL-2.0-or-later). See
+[LICENSE](LICENSE).
+
+A few of the libraries pzwm is compiled with (winit, gethostname, cgmath,
+approx) are Apache-2.0 only, which is compatible with GPL version 3
+but not with version 2. So a compiled pzwm binary is distributed under
+GPL-3.0-or-later; the source in this repository stays GPL-2.0-or-later.
