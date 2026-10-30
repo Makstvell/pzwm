@@ -807,8 +807,9 @@ an SVG icon get the card without one). `semantic_zoom = 0` turns it off.
   sharing and screenshot requests to it. pzwm offers
   **ext-image-copy-capture**, which the portal prefers: its older
   wlr-screencopy path in xdg-desktop-portal-wlr 0.8.4 stops after the
-  first frame (upstream issue #411). Captures are XRGB8888 or ARGB8888
-  shm buffers, and every frame is reported as changed.
+  first frame (upstream issue #411). Captures are XRGB8888 shm buffers
+  (ext-image-copy-capture also offers ARGB8888), and every frame is
+  reported as changed.
 - **Screenshots**: `Print` saves the screen to `~/Pictures/Screenshots`,
   `Super+Shift+S` copies a selected area. Both use `grim` and `slurp`,
   which work through wlr-screencopy.
