@@ -66,7 +66,7 @@ further windows always open by the window they belong to. Details:
 |---|---|---|
 | Pick where a new window opens: drag out its area and it takes exactly that area | `Super+O`, `Super+Ctrl` + left drag, `Super+Shift+Return`; every window: `[canvas] new_window_placement = "pick"` | [Where new windows open](#where-new-windows-open) |
 | Windows an app opens by itself (Zoom's meeting window, dialogs) open by the one they came from, and the camera fits them; windows you launch are never put there | `[canvas] place_near_siblings` | [Where new windows open](#where-new-windows-open) |
-| Ideal size: the whole screen without the bar at 100 %; again: back | `Super+Shift+F` (fullscreen moved to `Super+Ctrl+F`) | [Shortcuts](#windows) |
+| Ideal size: the display's resolution at 100 % (a bar left out if there is one) or your own `ideal_sizes`; again: back | `Super+Shift+F` (fullscreen moved to `Super+Ctrl+F`) | [Shortcuts](#windows) |
 | Size hint: the ideal size (the display's resolution, without a bar if there is one, or your own sizes) pulls a dragged area or a resized window in and shows as an outline | hold `Alt` for a free size; `[canvas] size_hints`, `ideal_sizes` | [Size hints](#size-hints) |
 | Tile grid over the screen: drag across cells, any mix of halves, thirds, quarters | `Super+T`; `[canvas] tile_grid` | [Tile grid](#putting-windows-on-the-screen-tile-grid-halves-corners) |
 | Tiling at 100 %: tiled windows get real-pixel sizes whatever the zoom (or are pinned) | `[canvas] tile_mode` | [Tile grid](#putting-windows-on-the-screen-tile-grid-halves-corners) |
@@ -105,8 +105,9 @@ further windows always open by the window they belong to. Details:
   (Zoom's meeting window, a dialog) opens beside or over the one it came
   from, and the camera fits it, at most at 100 %. A window you launch
   yourself is never put there, even of an app that is already running.
-- **Ideal size** (`Super+Shift+F`): the window takes the whole screen
-  without the bar at 100 %; again: back to its size and place.
+- **Ideal size** (`Super+Shift+F`): the window takes the display's
+  resolution at 100 % (a bar left out if there is one), or the first of
+  your own `[canvas] ideal_sizes`; again: back to its size and place.
 - **Tile grid** (`Super+T`): a 6 × 4 grid over the screen; drag across the
   cells and the window fills them: a half, a third, a quarter, a sixth,
   any block. Several windows side by side however you like.
@@ -221,7 +222,7 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 4. **Hold `Super` and scroll** to zoom; **hold the middle mouse button and
    drag** to move around.
 5. Put windows side by side with `Super+T` (drag across the grid cells),
-   or give one the whole screen at 100 % with `Super+Shift+F`.
+   or give one the display's resolution at 100 % with `Super+Shift+F`.
 6. Open **pzwm config** from the launcher to change settings and shortcuts.
 
 ## How it works
