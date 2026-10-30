@@ -85,9 +85,9 @@ place_near_siblings = true
 #   "center"  the middle of the view;
 #   "pick"    it waits until you drag out its area and takes exactly that
 #             area (Enter: beside the focused window, Escape: the middle);
-#   "beside"  at the ideal size next to the focused window, in the order of
-#             [general] window_numbers: right for rows, below for columns,
-#             left for rows-rtl.
+#   "beside"  at the ideal size right next to the focused window, in the
+#             order of [general] window_numbers: right for rows, below for
+#             columns, left for rows-rtl; windows already there move along.
 # Dialogs and an app's further windows never wait.
 new_window_placement = "center"
 # Cells of the Super+T grid, "COLSxROWS" (up to 12x12): 6x4 makes halves,

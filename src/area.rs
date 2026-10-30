@@ -9,9 +9,10 @@
 //!   area (Escape: the middle of the view; Enter: beside the focused
 //!   window, see below);
 //! - **beside the focused window** at the ideal size (Enter while picking,
-//!   or always with `new_window_placement = "beside"`): the next free
-//!   place in the reading order of `[general] window_numbers`, to the right
-//!   for rows, below for columns, to the left for rows-rtl;
+//!   or always with `new_window_placement = "beside"`): right next to it
+//!   in the reading order of `[general] window_numbers` (to the right for
+//!   rows, below for columns, to the left for rows-rtl), the windows that
+//!   follow in that row pushed along to make room;
 //! - next to a **sibling**: a window an app opens by itself, while it
 //!   already has one on the workspace (same process, nothing launched by
 //!   the user just before), opens beside it (small ones over it) and the
@@ -100,38 +101,73 @@ pub fn beside(
         .unwrap_or(candidates[0])
 }
 
-/// Most windows stepped over looking for a free place in reading order.
-const MAX_STEPS: usize = 64;
+/// A window moved along to make room: its id and how far.
+pub type Push = (u64, Point<f64, Logical>);
 
-/// Top-left of a frame of `size` next to `anchor` in reading order:
-/// right of it for rows (left for rows-rtl, below for columns), past any
-/// of `others` in the way.
-pub fn next_in_order(
+/// Where a frame of `size` goes right next to `anchor` in reading order
+/// (right of it for rows, left for rows-rtl, below for columns), and how
+/// far each of `others` (id, frame) in its way moves along so it fits:
+/// the windows that follow in that row (column) are pushed on, each as
+/// far as needed, keeping the gaps that were already wide enough.
+pub fn insert_in_order(
     anchor: Rectangle<f64, Logical>,
     size: Size<f64, Logical>,
-    others: &[Rectangle<f64, Logical>],
+    others: &[(u64, Rectangle<f64, Logical>)],
     gap: f64,
     how: Numbering,
-) -> Point<f64, Logical> {
+) -> (Point<f64, Logical>, Vec<Push>) {
     let a = anchor;
-    let mut p: Point<f64, Logical> = match how {
-        Numbering::Rows | Numbering::Opened => (a.loc.x + a.size.w + gap, a.loc.y).into(),
-        Numbering::RowsRtl => (a.loc.x - gap - size.w, a.loc.y).into(),
-        Numbering::Columns => (a.loc.x, a.loc.y + a.size.h + gap).into(),
-    };
-    for _ in 0..MAX_STEPS {
-        let r = Rectangle::new(p, size);
-        let Some(o) = others.iter().find(|o| o.overlaps(r)) else {
-            break;
-        };
-        // Step past the window in the way, keeping the row (column).
+    // Work as if along +x: columns swap the axes, rows-rtl mirrors them.
+    let flip = |r: Rectangle<f64, Logical>| -> Rectangle<f64, Logical> {
         match how {
-            Numbering::Rows | Numbering::Opened => p.x = o.loc.x + o.size.w + gap,
-            Numbering::RowsRtl => p.x = o.loc.x - gap - size.w,
-            Numbering::Columns => p.y = o.loc.y + o.size.h + gap,
+            Numbering::Rows | Numbering::Opened => r,
+            Numbering::RowsRtl => Rectangle::new((-r.loc.x - r.size.w, r.loc.y).into(), r.size),
+            Numbering::Columns => {
+                Rectangle::new((r.loc.y, r.loc.x).into(), (r.size.h, r.size.w).into())
+            }
         }
+    };
+    let unflip_delta = |d: f64| -> Point<f64, Logical> {
+        match how {
+            Numbering::Rows | Numbering::Opened => (d, 0.0).into(),
+            Numbering::RowsRtl => (-d, 0.0).into(),
+            Numbering::Columns => (0.0, d).into(),
+        }
+    };
+    let fa = flip(a);
+    let fnew = flip(Rectangle::new(a.loc, size));
+    let new = Rectangle::new(
+        Point::from((fa.loc.x + fa.size.w + gap, fa.loc.y)),
+        fnew.size,
+    );
+    // The windows after the anchor that share the new window's row.
+    let mut row: Vec<(u64, Rectangle<f64, Logical>)> = others
+        .iter()
+        .map(|&(id, r)| (id, flip(r)))
+        .filter(|(_, r)| {
+            r.loc.y < new.loc.y + new.size.h
+                && r.loc.y + r.size.h > new.loc.y
+                && r.loc.x + r.size.w / 2.0 > fa.loc.x + fa.size.w / 2.0
+        })
+        .collect();
+    row.sort_by(|x, y| x.1.loc.x.total_cmp(&y.1.loc.x));
+    let mut edge = new.loc.x + new.size.w + gap;
+    let mut moves = Vec::new();
+    for (id, r) in row {
+        if r.loc.x >= edge {
+            break;
+        }
+        let d = edge - r.loc.x;
+        moves.push((id, unflip_delta(d)));
+        edge = r.loc.x + d + r.size.w + gap;
     }
-    p
+    // Back to canvas coordinates.
+    let loc = match how {
+        Numbering::Rows | Numbering::Opened => new.loc,
+        Numbering::RowsRtl => (-new.loc.x - new.size.w, new.loc.y).into(),
+        Numbering::Columns => (new.loc.y, new.loc.x).into(),
+    };
+    (loc, moves)
 }
 
 /// Parses `X,Y WxH` (canvas units) for `area rect`.
@@ -360,11 +396,12 @@ impl State {
         }
     }
 
-    /// Frame of the ideal size next to the focused window on `ws`, in the
-    /// reading order of window numbers; `None` without a focused canvas
-    /// window there. `skip` is the window being placed.
+    /// Frame of the ideal size right next to the focused window on `ws`,
+    /// in the reading order of window numbers; the windows in its way are
+    /// pushed along. `None` without a canvas window to go beside. `skip` is
+    /// the window being placed.
     fn beside_focused(
-        &self,
+        &mut self,
         output: &Output,
         ws: usize,
         skip: Option<u64>,
@@ -378,22 +415,31 @@ impl State {
                 && o.ws == ws
                 && o.placement == Placement::Canvas
         };
-        let focused = self.focused.as_ref()?;
+        // The focused window, else the one focused last (windows are kept
+        // in focus order).
         let anchor = self
             .windows
             .iter()
             .filter(usable)
-            .find(|o| &o.window == focused)?;
+            .find(|o| self.focused.as_ref() == Some(&o.window))
+            .or_else(|| self.windows.iter().find(usable))?;
+        let anchor_id = anchor.id;
         let anchor = self.canvas_frame(anchor);
         let size = self.ideal_sizes(output).first()?.size;
         let others: Vec<_> = self
             .windows
             .iter()
             .filter(usable)
-            .map(|o| self.canvas_frame(o))
+            .filter(|o| o.id != anchor_id)
+            .map(|o| (o.id, self.canvas_frame(o)))
             .collect();
         let gap = (self.config.appearance.gaps as f64).max(MIN_SIBLING_GAP);
-        let loc = next_in_order(anchor, size, &others, gap, self.numbering());
+        let (loc, moves) = insert_in_order(anchor, size, &others, gap, self.numbering());
+        for (id, delta) in moves {
+            if let Some(idx) = self.index_of_id(id) {
+                self.windows[idx].pos += delta;
+            }
+        }
         Some(Rectangle::new(loc, size))
     }
 
@@ -678,27 +724,52 @@ mod tests {
     }
 
     #[test]
-    fn rows_open_to_the_right_past_windows_in_the_way() {
+    fn rows_open_right_next_to_the_anchor() {
         let anchor = rect(0.0, 0.0, 1000.0, 600.0);
-        let taken = rect(1020.0, 100.0, 500.0, 300.0);
-        let p = next_in_order(
-            anchor,
-            (1000.0, 600.0).into(),
-            &[anchor, taken],
-            20.0,
-            Numbering::Rows,
-        );
-        assert_eq!(p, Point::from((1540.0, 0.0)));
+        let (p, moves) = insert_in_order(anchor, (800.0, 600.0).into(), &[], 20.0, Numbering::Rows);
+        assert_eq!(p, Point::from((1020.0, 0.0)));
+        assert!(moves.is_empty());
     }
 
     #[test]
-    fn columns_open_below_and_rtl_to_the_left() {
+    fn the_rest_of_the_row_is_pushed_along() {
         let anchor = rect(0.0, 0.0, 1000.0, 600.0);
-        let size: Size<f64, Logical> = (800.0, 500.0).into();
-        let below = next_in_order(anchor, size, &[anchor], 20.0, Numbering::Columns);
-        assert_eq!(below, Point::from((0.0, 620.0)));
-        let left = next_in_order(anchor, size, &[anchor], 20.0, Numbering::RowsRtl);
-        assert_eq!(left, Point::from((-820.0, 0.0)));
+        let next = rect(1020.0, 0.0, 500.0, 600.0);
+        let after = rect(1540.0, 50.0, 500.0, 400.0);
+        let far = rect(9000.0, 0.0, 500.0, 600.0);
+        let other_row = rect(1020.0, 2000.0, 500.0, 600.0);
+        let others = [(1, next), (2, after), (3, far), (4, other_row)];
+        let (p, moves) = insert_in_order(
+            anchor,
+            (800.0, 600.0).into(),
+            &others,
+            20.0,
+            Numbering::Rows,
+        );
+        assert_eq!(p, Point::from((1020.0, 0.0)));
+        // The new window ends at 1820: next moves to 1840, after to 2360;
+        // far and the other row stay.
+        assert_eq!(
+            moves,
+            vec![
+                (1, Point::from((820.0, 0.0))),
+                (2, Point::from((820.0, 0.0)))
+            ]
+        );
+    }
+
+    #[test]
+    fn columns_push_down_and_rtl_pushes_left() {
+        let anchor = rect(0.0, 0.0, 1000.0, 600.0);
+        let size: Size<f64, Logical> = (1000.0, 500.0).into();
+        let below = rect(0.0, 620.0, 1000.0, 600.0);
+        let (p, moves) = insert_in_order(anchor, size, &[(1, below)], 20.0, Numbering::Columns);
+        assert_eq!(p, Point::from((0.0, 620.0)));
+        assert_eq!(moves, vec![(1, Point::from((0.0, 520.0)))]);
+        let left = rect(-820.0, 0.0, 800.0, 600.0);
+        let (p, moves) = insert_in_order(anchor, size, &[(2, left)], 20.0, Numbering::RowsRtl);
+        assert_eq!(p, Point::from((-1020.0, 0.0)));
+        assert_eq!(moves, vec![(2, Point::from((-1020.0, 0.0)))]);
     }
 
     #[test]

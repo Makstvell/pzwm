@@ -678,6 +678,10 @@ impl XdgActivationHandler for State {
             return;
         }
         if let Some(idx) = self.index_of_surface(&surface) {
+            // A window still waiting for its place gets focus once placed.
+            if self.windows[idx].awaiting_pick {
+                return;
+            }
             let window = self.windows[idx].window.clone();
             let ws = self.windows[idx].ws;
             if self.windows[idx].placement != Placement::Pinned {

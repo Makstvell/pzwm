@@ -95,10 +95,9 @@ impl State {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::Area("cancel".into())));
                 }
-                if state.area.selecting
-                    && (sym == Keysym::Return || sym == Keysym::KP_Enter)
-                    && !pressed.logo
-                {
+                // Any Enter, Super+Return too: picking, it places the window
+                // instead of launching another one.
+                if state.area.selecting && (sym == Keysym::Return || sym == Keysym::KP_Enter) {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::Area("beside".into())));
                 }
