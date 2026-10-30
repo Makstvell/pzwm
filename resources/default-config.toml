@@ -91,9 +91,14 @@ tile_grid = "6x4"
 # "canvas" (at the current zoom).
 tile_mode = "zoom"
 # While an area is dragged out or a window resized, ideal sizes pull it in
-# and show as an outline: the whole screen at 100 %, its halves and quarter,
-# 1280x720, 1920x1080. Hold Alt for a free size.
+# and show as an outline. Hold Alt for a free size.
 size_hints = true
+# The ideal sizes. "screen" is the display's resolution at 100 % zoom: with
+# a bar that reserves space (waybar, DMS) its height is left out, without
+# one it is the whole display. Add your own as "WIDTHxHEIGHT" (the window's
+# content, logical pixels), e.g. ["screen", "1920x1080", "1280x720"].
+# Super+Shift+F (ideal-size) uses the first one.
+ideal_sizes = ["screen"]
 
 [minimap]
 # Map of the whole workspace with live previews of every window and the

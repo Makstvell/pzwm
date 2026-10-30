@@ -1,8 +1,8 @@
 //! Size hints while a window's size is chosen (dragging out an area,
 //! resizing): "ideal" sizes pull the size in when it comes near and show
 //! as an outline before that. The main one is the whole screen at 100 %
-//! zoom, where the app's pixels match the screen's; then its halves and
-//! quarter, 1280 × 720 and 1920 × 1080. Holding Alt turns the pull off.
+//! zoom, where the app's pixels match the screen's. Holding Alt turns the
+//! pull off.
 //! pzwm draws no text, so the size snapped to is named in a notification.
 
 use smithay::{
@@ -17,11 +17,11 @@ pub const SNAP_PX: f64 = 24.0;
 /// Closer than this the ideal size shows as an outline.
 pub const SHOW_PX: f64 = 120.0;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Ideal {
     /// Frame size (title bar included), canvas units at 100 % zoom.
     pub size: Size<f64, Logical>,
-    pub name: &'static str,
+    pub name: String,
 }
 
 /// What the hint shows on an output during a drag.
@@ -37,23 +37,44 @@ pub struct SizeHint {
 /// Ideal frame sizes for a usable screen area of `area` (logical pixels,
 /// which are canvas units at 100 %), with `gap` around windows and a
 /// title bar of `title`.
-pub fn ideal_sizes(area: Size<f64, Logical>, gap: f64, title: f64) -> Vec<Ideal> {
-    let full_w = area.w - 2.0 * gap;
-    let full_h = area.h - 2.0 * gap;
-    let half_w = (area.w - 3.0 * gap) / 2.0;
-    let half_h = (area.h - 3.0 * gap) / 2.0;
-    let ideal = |w: f64, h: f64, name| Ideal {
-        size: Size::from((w, h)),
-        name,
+/// An entry of `[canvas] ideal_sizes`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum IdealSpec {
+    /// The display's resolution, without a bar that reserves space.
+    Screen,
+    /// A window whose content is this big, logical pixels.
+    Content(f64, f64),
+}
+
+/// Parses "screen" or "WIDTHxHEIGHT"; `None` for anything else.
+pub fn parse_ideal(s: &str) -> Option<IdealSpec> {
+    let s = s.trim();
+    if s.eq_ignore_ascii_case("screen") {
+        return Some(IdealSpec::Screen);
+    }
+    let (w, h) = s.split_once(['x', 'X'])?;
+    let (w, h) = (w.trim().parse::<f64>().ok()?, h.trim().parse::<f64>().ok()?);
+    (w >= 1.0 && h >= 1.0 && w.is_finite() && h.is_finite()).then_some(IdealSpec::Content(w, h))
+}
+
+/// Ideal frame sizes for a usable screen `area` (logical pixels, which
+/// are canvas units at 100 %) and a title bar of `title`. No valid entry:
+/// the screen alone.
+pub fn ideal_sizes(area: Size<f64, Logical>, title: f64, specs: &[IdealSpec]) -> Vec<Ideal> {
+    let one = |spec: &IdealSpec| match *spec {
+        IdealSpec::Screen => Ideal {
+            size: area,
+            name: "the whole screen at 100 %".into(),
+        },
+        IdealSpec::Content(w, h) => Ideal {
+            size: Size::from((w, h + title)),
+            name: format!("{w} × {h}"),
+        },
     };
-    vec![
-        ideal(full_w, full_h, "the whole screen at 100 %"),
-        ideal(half_w, full_h, "half the screen, side by side"),
-        ideal(full_w, half_h, "half the screen, one above the other"),
-        ideal(half_w, half_h, "a quarter of the screen"),
-        ideal(1280.0, 720.0 + title, "1280 × 720 (HD)"),
-        ideal(1920.0, 1080.0 + title, "1920 × 1080 (Full HD)"),
-    ]
+    if specs.is_empty() {
+        return vec![one(&IdealSpec::Screen)];
+    }
+    specs.iter().map(one).collect()
 }
 
 /// The ideal size nearest to `size` and how far it is (the larger of the
@@ -78,7 +99,7 @@ pub fn nearest(
     };
     ideals
         .iter()
-        .map(|i| (*i, dist(i)))
+        .map(|i| (i.clone(), dist(i)))
         .min_by(|a, b| a.1.total_cmp(&b.1))
         .filter(|_| axes.0 || axes.1)
 }
@@ -111,10 +132,16 @@ pub fn pull(
 impl State {
     /// Ideal frame sizes for windows on `output`.
     pub fn ideal_sizes(&self, output: &Output) -> Vec<Ideal> {
-        let area = self.usable_area(output).size.to_f64();
-        let gap = self.config.appearance.gaps as f64;
+        let specs: Vec<IdealSpec> = self
+            .config
+            .canvas
+            .ideal_sizes
+            .iter()
+            .filter_map(|s| parse_ideal(s))
+            .collect();
         let title = self.config.appearance.titlebar_height as f64;
-        ideal_sizes(area, gap, title)
+        // "screen" is the display's resolution, without a bar that reserves space.
+        ideal_sizes(self.usable_area(output).size.to_f64(), title, &specs)
     }
 
     /// Alt held: sizes are free, nothing pulls.
@@ -134,9 +161,16 @@ impl State {
         if hint.snapped {
             let quote = crate::bindings::shell_quote;
             let s = hint.ideal.size;
+            let px = s.upscale(hint.output.current_scale().fractional_scale());
             self.spawn(&format!(
                 "notify-send -a pzwm -t 2500 -h string:x-canonical-private-synchronous:pzwm-size {} {}",
-                quote(&format!("{} × {}", s.w.round(), s.h.round())),
+                quote(&format!(
+                    "{} × {} ({} × {} px)",
+                    s.w.round(),
+                    s.h.round(),
+                    px.w.round(),
+                    px.h.round()
+                )),
                 quote(&format!("Ideal size: {}. Hold Alt for a free size.", hint.ideal.name)),
             ));
         }
@@ -153,16 +187,31 @@ mod tests {
     }
 
     #[test]
-    fn the_whole_screen_comes_first() {
-        let ideals = ideal_sizes(size(1707.0, 960.0), 10.0, 30.0);
-        assert_eq!(ideals[0].size, size(1687.0, 940.0));
-        assert_eq!(ideals[3].size, size(838.5, 465.0));
-        assert_eq!(ideals[4].size, size(1280.0, 750.0));
+    fn by_default_the_ideal_is_the_screen() {
+        let ideals = ideal_sizes(size(1707.0, 960.0), 30.0, &[]);
+        assert_eq!(ideals.len(), 1);
+        assert_eq!(ideals[0].size, size(1707.0, 960.0));
+    }
+
+    #[test]
+    fn own_sizes_are_content_plus_the_title_bar() {
+        let specs = [IdealSpec::Screen, IdealSpec::Content(1280.0, 720.0)];
+        let ideals = ideal_sizes(size(1707.0, 960.0), 30.0, &specs);
+        assert_eq!(ideals[1].size, size(1280.0, 750.0));
+        assert_eq!(ideals[1].name, "1280 × 720");
+    }
+
+    #[test]
+    fn ideal_entries_parse() {
+        assert_eq!(parse_ideal("screen"), Some(IdealSpec::Screen));
+        assert_eq!(parse_ideal(" 1920x1080 "), Some(IdealSpec::Content(1920.0, 1080.0)));
+        assert_eq!(parse_ideal("0x10"), None);
+        assert_eq!(parse_ideal("big"), None);
     }
 
     #[test]
     fn a_near_size_is_pulled_in() {
-        let ideals = ideal_sizes(size(1000.0, 600.0), 0.0, 0.0);
+        let ideals = ideal_sizes(size(1000.0, 600.0), 0.0, &[]);
         let (pulled, hint) = pull(size(990.0, 610.0), &ideals, (true, true), 24.0, 120.0);
         assert_eq!(pulled, size(1000.0, 600.0));
         assert_eq!(hint.map(|(_, snapped)| snapped), Some(true));
@@ -170,7 +219,7 @@ mod tests {
 
     #[test]
     fn a_size_on_the_way_only_shows_the_outline() {
-        let ideals = ideal_sizes(size(1000.0, 600.0), 0.0, 0.0);
+        let ideals = ideal_sizes(size(1000.0, 600.0), 0.0, &[]);
         let (pulled, hint) = pull(size(940.0, 600.0), &ideals, (true, true), 24.0, 120.0);
         assert_eq!(pulled, size(940.0, 600.0));
         assert_eq!(hint.map(|(_, snapped)| snapped), Some(false));
@@ -178,14 +227,14 @@ mod tests {
 
     #[test]
     fn a_far_size_shows_nothing() {
-        let ideals = ideal_sizes(size(3000.0, 2000.0), 0.0, 0.0);
+        let ideals = ideal_sizes(size(3000.0, 2000.0), 0.0, &[]);
         let (_, hint) = pull(size(200.0, 150.0), &ideals, (true, true), 24.0, 120.0);
         assert_eq!(hint, None);
     }
 
     #[test]
     fn only_the_resized_axis_snaps() {
-        let ideals = ideal_sizes(size(1000.0, 600.0), 0.0, 0.0);
+        let ideals = ideal_sizes(size(1000.0, 600.0), 0.0, &[]);
         // Dragging the right edge: the height stays what it is.
         let (pulled, _) = pull(size(995.0, 123.0), &ideals, (true, false), 24.0, 120.0);
         assert_eq!(pulled, size(1000.0, 123.0));

@@ -157,6 +157,10 @@ pub struct Canvas {
     /// 100 % first: real-pixel sizes), "pin" (pin it at 1:1), "canvas"
     /// (at the current zoom).
     pub tile_mode: String,
+    /// Ideal sizes for size hints and `ideal-size` (the first one):
+    /// "screen" (the display, without a bar) or "WIDTHxHEIGHT" (content,
+    /// logical pixels).
+    pub ideal_sizes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -442,6 +446,7 @@ impl Default for Canvas {
             tile_grid: "6x4".into(),
             size_hints: true,
             tile_mode: "zoom".into(),
+            ideal_sizes: vec!["screen".into()],
         }
     }
 }

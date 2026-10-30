@@ -67,7 +67,7 @@ further windows always open by the window they belong to. Details:
 | Pick where a new window opens: drag out its area and it takes exactly that area | `Super+O`, `Super+Ctrl` + left drag, `Super+Shift+Return`; every window: `[canvas] new_window_placement = "pick"` | [Where new windows open](#where-new-windows-open) |
 | Windows an app opens by itself (Zoom's meeting window, dialogs) open by the one they came from, and the camera fits them; windows you launch are never put there | `[canvas] place_near_siblings` | [Where new windows open](#where-new-windows-open) |
 | Ideal size: the whole screen without the bar at 100 %; again: back | `Super+Shift+F` (fullscreen moved to `Super+Ctrl+F`) | [Shortcuts](#windows) |
-| Size hints: ideal sizes pull a dragged area or a resized window in and show as an outline | hold `Alt` for a free size; `[canvas] size_hints` | [Size hints](#size-hints) |
+| Size hint: the ideal size (the display's resolution, without a bar if there is one, or your own sizes) pulls a dragged area or a resized window in and shows as an outline | hold `Alt` for a free size; `[canvas] size_hints`, `ideal_sizes` | [Size hints](#size-hints) |
 | Tile grid over the screen: drag across cells, any mix of halves, thirds, quarters | `Super+T`; `[canvas] tile_grid` | [Tile grid](#putting-windows-on-the-screen-tile-grid-halves-corners) |
 | Tiling at 100 %: tiled windows get real-pixel sizes whatever the zoom (or are pinned) | `[canvas] tile_mode` | [Tile grid](#putting-windows-on-the-screen-tile-grid-halves-corners) |
 | Snap thirds and corner quarters | `Super+[` / `]` again: ⅓, ⅔; drop in a corner | [Tile grid](#putting-windows-on-the-screen-tile-grid-halves-corners) |
@@ -93,10 +93,10 @@ further windows always open by the window they belong to. Details:
   window waits until you drag out its area and then takes exactly that
   area; Escape puts it in the middle. Dialogs and an app's further
   windows skip it and open by their parent.
-- **Size hints**: while you drag out an area or resize a window, ideal
-  sizes pull it in and show as an outline: the whole screen at 100 %
-  (the app's pixels match the screen's), its halves and quarter, 1280 ×
-  720, 1920 × 1080. A notification names the size; hold Alt for a free
+- **Size hints**: while you drag out an area or resize a window, the
+  ideal size, the whole screen at 100 % (the display's resolution, the
+  bar left out, so the app's pixels match the screen's), pulls it in and
+  shows as an outline. A notification names the size; hold Alt for a free
   size.
 - **Window numbers by place**: `Super+1` … `Super+0` count the windows
   from the top left (or top right, by columns, or in opening order); hold
@@ -269,20 +269,29 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 ### Size hints
 
 While you drag out an area (`Super+O`, pick mode) or resize a window by
-an edge, the nearest **ideal size** shows as an outline once you get
-close, and within about 24 screen pixels the size snaps onto it. A
-notification then names it, for example `1687 × 940: the whole screen at
-100 %`.
+an edge, the **ideal size** shows as an outline once you get close, and
+within about 24 screen pixels the size snaps onto it. A notification then
+names it, for example `1707 × 960 (2560 × 1440 px)`.
 
-| Ideal size | Why |
-|---|---|
-| the whole screen at 100 % | fills the screen without zooming: the app's pixels are the screen's (with the monitor's scale) |
-| half the screen, side by side / one above the other | two windows next to each other at 100 % |
-| a quarter of the screen | four windows at 100 % |
-| 1280 × 720, 1920 × 1080 | common video and app sizes |
+By default the ideal size is the display's resolution at 100 % zoom: with
+a bar that reserves space (waybar, DMS) its height is left out, without
+one it is the whole display. The window then fills the screen and the
+app's pixels are the screen's. The notification shows both sizes, for
+example `1707 × 960 (2560 × 1440 px)`: logical pixels and the display's
+own. When only one edge is dragged, only that side snaps (the full width,
+or the full height).
 
-Sizes are logical pixels, so they follow the monitor's resolution and
-scale. Hold `Alt` while dragging for a free size; `[canvas] size_hints =
+Your own ideal sizes go in `[canvas] ideal_sizes`:
+
+```toml
+[canvas]
+ideal_sizes = ["screen", "1920x1080", "1280x720"]   # default: ["screen"]
+```
+
+`"screen"` is the display as above; `"WIDTHxHEIGHT"` is a window whose
+content is that big, in logical pixels (the same as `size` in window
+rules). The hints pull to any of them; `Super+Shift+F` uses the first
+one, in the middle of the screen when it is smaller. Hold `Alt` while dragging for a free size; `[canvas] size_hints =
 false` turns the hints off.
 
 ### Window numbers
@@ -367,7 +376,7 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | drag the title bar / `Super+Shift` + left drag | move a window |
 | drag an edge or corner / `Super` + right drag | resize a window |
 | double-click the title bar, `Super+F` | maximize / restore |
-| `Super+Shift+F` | ideal size: the whole screen without the bar at 100 % (again: back) |
+| `Super+Shift+F` | ideal size: the display's resolution at 100 %, without a bar if there is one, or the first of `[canvas] ideal_sizes` (again: back) |
 | `Super+Ctrl+F` | fullscreen / restore |
 | `Super+P`, pin button | pin to the screen / back to the canvas |
 | `Super+T` | tile grid: drag across cells (or arrows, Shift+arrows, Enter) |
@@ -488,7 +497,7 @@ the old settings and shows a notification.
 |---|---|
 | `[general]` | autostart commands, scale, cursor, X11 apps, systemd session, auto reload, `window_numbers` |
 | `[input]` | keyboard layouts (at most 4), XKB options, key repeat, touchpad, pointer speed |
-| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size, `new_window_placement` (`center`/`pick`), `place_near_siblings`, `tile_grid`, `tile_mode`, `size_hints` |
+| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size, `new_window_placement` (`center`/`pick`), `place_near_siblings`, `tile_grid`, `tile_mode`, `size_hints`, `ideal_sizes` |
 | `[[output]]` | one block per monitor: mode, scale, position, mirror, disable |
 | `[appearance]` | gaps, borders, corners, title bars, shadows, colors (`"#RRGGBB"` or `"#RRGGBBAA"`) |
 | `[animation]` | animations on/off and their length |
@@ -532,7 +541,7 @@ triggers: `left`, `right`, `middle`, `back`, `forward`, `scroll`.
 | `spawn <command>` | run a shell command |
 | `close`, `maximize`, `fullscreen`, `pin` | window actions |
 | `fit`, `center` | fit the focused window to the screen / center it without zooming |
-| `ideal-size` | the whole usable screen at 100 %; again: back to the size and place it had |
+| `ideal-size` | the first ideal size (`[canvas] ideal_sizes`, by default the display without a bar) at 100 %; again: back to the size and place it had |
 | `overview`, `minimap`, `home` | overview, minimap, back to the start |
 | `zoom-in`, `zoom-out`, `zoom-reset` | zoom |
 | `focus left\|right\|up\|down\|next\|prev` | move focus |

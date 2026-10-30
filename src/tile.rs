@@ -337,9 +337,20 @@ impl State {
             let m = &self.windows[idx];
             (m.pos, m.ws, m.window.geometry().size)
         };
+        // The first ideal size: the display (without a bar) by default, or
+        // the user's own size, in the middle of the screen.
         let area = self.usable_area(&output).to_f64();
-        let gap = self.config.appearance.gaps as f64;
-        let rect = cells_rect(area, gap, (1, 1), (0, 0, 0, 0));
+        let frame = self
+            .ideal_sizes(&output)
+            .first()
+            .map_or(area.size, |i| i.size);
+        let rect = Rectangle::new(
+            Point::from((
+                area.loc.x + ((area.size.w - frame.w) / 2.0).max(0.0),
+                area.loc.y + ((area.size.h - frame.h) / 2.0).max(0.0),
+            )),
+            frame,
+        );
         self.place_in_screen_rect(idx, &output, rect);
         let title = self.title_height(&self.windows[idx]);
         let zoom = match self.windows[idx].placement {
