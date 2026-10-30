@@ -112,6 +112,17 @@ pub struct Workspace {
 }
 
 impl Workspace {
+    /// A workspace whose camera starts at the canvas origin at `zoom`.
+    pub fn starting_at(zoom: f64) -> Self {
+        Self {
+            camera: Camera {
+                pos: Point::from((0.0, 0.0)),
+                zoom,
+            },
+            anim: None,
+        }
+    }
+
     pub fn camera(&self, now: Instant) -> Camera {
         match self.anim {
             Some(a) => {

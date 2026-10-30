@@ -72,6 +72,7 @@ PAGES = (
         (
             Option("new_window_width", "New window width", "float", "Share of the screen", 0.1, 1, 0.05),
             Option("new_window_height", "New window height", "float", "Share of the screen", 0.1, 1, 0.05),
+            Option("start_zoom", "Start zoom", "float", "Zoom each workspace starts at and Super+Home goes back to; 0.667 shows about 1.5 screens", 0.1, 2, 0.05),
             Option("semantic_zoom", "Semantic zoom below", "float", "Zoom under which windows become app cards; 0 turns it off", 0, 1, 0.05),
             Option("new_window_placement", "Where new windows open", "choice", "pick: drag out the place of each new window; dialogs and an app's further windows open by it", choices=("center", "pick")),
             Option("tile_grid", "Tile grid (Super+T)", "str", "Columns x rows, e.g. 6x4"),

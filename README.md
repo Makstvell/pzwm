@@ -255,9 +255,10 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
   over them.
 - Side by side placement is on by default; `[canvas] place_near_siblings =
   false` turns it off.
-- With `tile_mode = "zoom"` (the default) the camera goes to 100 % when a
-  pick starts, so the screen shows real pixels and the "whole screen"
-  size hint is exactly the screen without the bar.
+- Picking an area never changes the zoom: you drag at the view you have.
+  Each workspace starts at `[canvas] start_zoom` (0.667 by default, so
+  about 1.5 screens show), which leaves room around a screen-sized
+  window; `Super+Home` goes back to it.
 - Pick mode skips windows placed by a rule with a `position` or a
   `workspace`, windows restored from a desktop profile, the scratchpad,
   dialogs and fixed-size windows.
@@ -361,7 +362,7 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | touchpad: pinch / two fingers on empty canvas / three-finger swipe | zoom / move the canvas / move the canvas anywhere |
 | `Super+=` / `Super+-` | zoom in / out |
 | `Super+BackSpace` | zoom to 100 % |
-| `Super+Home` | go back to the start of the canvas |
+| `Super+Home` | go back to the start of the canvas, at `[canvas] start_zoom` |
 | `Super+Alt+arrows` | move the canvas |
 | `Super+C` | fit the focused window: center it and zoom to fill the screen |
 | `Super+Tab` or `Super+Z` | overview of all windows; again to go back |
@@ -498,7 +499,7 @@ the old settings and shows a notification.
 |---|---|
 | `[general]` | autostart commands, scale, cursor, X11 apps, systemd session, auto reload, `window_numbers` |
 | `[input]` | keyboard layouts (at most 4), XKB options, key repeat, touchpad, pointer speed |
-| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size, `new_window_placement` (`center`/`pick`), `place_near_siblings`, `tile_grid`, `tile_mode`, `size_hints`, `ideal_sizes` |
+| `[canvas]` | zoom, panning, snapping, edge tiling, grid, new window size, `new_window_placement` (`center`/`pick`), `place_near_siblings`, `tile_grid`, `tile_mode`, `size_hints`, `ideal_sizes`, `start_zoom` |
 | `[[output]]` | one block per monitor: mode, scale, position, mirror, disable |
 | `[appearance]` | gaps, borders, corners, title bars, shadows, colors (`"#RRGGBB"` or `"#RRGGBBAA"`) |
 | `[animation]` | animations on/off and their length |

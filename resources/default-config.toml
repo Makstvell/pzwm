@@ -75,6 +75,9 @@ new_window_height = 0.9  # dialogs and fixed-size windows keep their own size
 # Semantic zoom: below this zoom windows turn into cards in their app's
 # color with the app icon (0 turns it off).
 semantic_zoom = 0.3
+# Zoom each workspace starts at, and Super+Home goes back to. Below 1 leaves
+# room around a screen-sized window: 0.667 shows about 1.5 screens.
+start_zoom = 0.667
 # A new window of an app that already has one on the workspace (a second
 # Zoom or Telegram window) opens beside it; dialog-sized ones open over it.
 place_near_siblings = true

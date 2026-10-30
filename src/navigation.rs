@@ -352,11 +352,15 @@ impl State {
         self.queue_redraw(output);
     }
 
+    /// Back to the canvas origin at `[canvas] start_zoom`.
     pub fn home(&mut self, output: &Output) {
         let ws = self.output_ws(output);
         let dur = self.camera_duration();
-        self.workspace_mut(ws)
-            .animate_to(Camera::default(), dur, Instant::now());
+        let home = Camera {
+            zoom: self.config.canvas.start_zoom(),
+            ..Camera::default()
+        };
+        self.workspace_mut(ws).animate_to(home, dur, Instant::now());
         self.queue_redraw(output);
     }
 

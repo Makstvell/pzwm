@@ -136,7 +136,6 @@ impl State {
     }
 
     fn begin_area_pick(&mut self, spawn: Option<String>) -> Result<String, String> {
-        self.full_scale_for_pick();
         self.area.selecting = true;
         self.area.spawn = spawn;
         self.cursor_override = Some(CursorIcon::Crosshair);
@@ -158,16 +157,6 @@ impl State {
         }
         self.queue_redraw_all();
         self.pick_next_window();
-    }
-
-    /// With `tile_mode = "zoom"` an area is picked at 100 %, so the screen
-    /// shows real pixels and the ideal sizes match what is seen.
-    fn full_scale_for_pick(&mut self) {
-        if self.config.canvas.tile_mode == "zoom" {
-            if let Some(output) = self.active_output() {
-                self.camera_to_full_scale(&output);
-            }
-        }
     }
 
     /// A `spawn` from a bind, the launcher or `pzwm msg`: its window,
@@ -225,8 +214,7 @@ impl State {
                 continue;
             };
             let app = self.app_id(&self.windows[idx]).unwrap_or_default();
-            self.full_scale_for_pick();
-            self.area.window = Some(id);
+                self.area.window = Some(id);
             self.area.selecting = true;
             self.cursor_override = Some(CursorIcon::Crosshair);
             let quote = crate::bindings::shell_quote;

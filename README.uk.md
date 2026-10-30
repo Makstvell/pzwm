@@ -196,7 +196,7 @@ cd pzwm
 | `Super+P` | закріпити на екрані ↔ назад на полотно |
 | `Super+Tab` / `Super+Z`, `Super+M` | огляд, міні-карта |
 | `Super+C` | вікно по центру, зум на весь екран |
-| `Super+Home`, `Super+BackSpace`, `Super+=` / `Super+-` | на початок, зум 100 %, зум |
+| `Super+Home`, `Super+BackSpace`, `Super+=` / `Super+-` | на початок (зум `start_zoom`), зум 100 %, зум |
 | `Super+стрілки`, `Alt+Tab` | фокус |
 | `Super+1..0`, `Super+Ctrl+1..0`, `Super+Shift+1..0` | вікно за номером (від лівого верхнього кута; тримай `Super` і набирай далі — 11, 12…), воркспейс, перенести вікно |
 | `Super+/` | пошук вікна, групи чи закладки |
@@ -237,9 +237,10 @@ cd pzwm
   важливіша.
 - Розміщення поруч увімкнене за замовчуванням; вимкнути:
   `[canvas] place_near_siblings = false`.
-- З `tile_mode = "zoom"` (за замовчуванням) на початку вибору камера
-  переходить на 100 %: екран показує справжні пікселі, а підказка «весь
-  екран» — рівно екран без бару.
+- Вибір зони ніколи не змінює зум: тягнеш на тому виді, що є. Кожен
+  воркспейс стартує із зумом `[canvas] start_zoom` (за замовчуванням
+  0.667 — видно ~1.5 екрана), тож навколо вікна на весь екран є місце;
+  `Super+Home` повертає до нього.
 - Режим вибору не питає про вікна з правилом `position` чи `workspace`,
   вікна з профілю, скретчпад, діалоги й вікна фіксованого розміру.
 - Зі скриптів: `pzwm msg area`, `area spawn <команда>`, `area cancel`,
@@ -351,7 +352,7 @@ Profiles. Зберігаються лише змінені рядки, коме�
 |---|---|
 | `[general]` | автостарт, масштаб, курсор, X11, `picker`, `autosave`, `window_numbers` |
 | `[input]` | розкладки (до 4), XKB, повтор клавіш, тачпад |
-| `[canvas]` | зум, рух, прилипання, сітка, розмір нових вікон, `semantic_zoom`, `new_window_placement` (`center`/`pick`), `place_near_siblings`, `tile_grid`, `tile_mode`, `size_hints`, `ideal_sizes` |
+| `[canvas]` | зум, рух, прилипання, сітка, розмір нових вікон, `semantic_zoom`, `new_window_placement` (`center`/`pick`), `place_near_siblings`, `tile_grid`, `tile_mode`, `size_hints`, `ideal_sizes`, `start_zoom` |
 | `[[output]]` | монітор: режим, масштаб, позиція, `mirror`, `disable` |
 | `[appearance]`, `[animation]` | вигляд і анімації |
 | `[parallax]` | паралакс шпалер, див. нижче |

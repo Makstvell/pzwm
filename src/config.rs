@@ -161,6 +161,21 @@ pub struct Canvas {
     /// "screen" (the display, without a bar) or "WIDTHxHEIGHT" (content,
     /// logical pixels).
     pub ideal_sizes: Vec<String>,
+    /// Zoom each workspace starts at, and `home` goes back to: below 1
+    /// leaves room around a screen-sized window (0.667: 1.5 screens show).
+    pub start_zoom: f64,
+}
+
+impl Canvas {
+    /// `start_zoom` kept within the zoom limits.
+    pub fn start_zoom(&self) -> f64 {
+        let z = if self.start_zoom.is_finite() && self.start_zoom > 0.0 {
+            self.start_zoom
+        } else {
+            1.0
+        };
+        z.clamp(self.min_zoom, self.max_zoom)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -447,6 +462,7 @@ impl Default for Canvas {
             size_hints: true,
             tile_mode: "zoom".into(),
             ideal_sizes: vec!["screen".into()],
+            start_zoom: 1.0 / 1.5,
         }
     }
 }

@@ -344,6 +344,7 @@ impl State {
         let cursor_theme =
             CursorTheme::load(&config.general.cursor_theme, config.general.cursor_size);
 
+        let start = config.canvas.start_zoom();
         Ok(State {
             display_handle: dh,
             loop_handle,
@@ -381,7 +382,7 @@ impl State {
             pointer,
             windows: Vec::new(),
             next_window_id: 1,
-            workspaces: [Workspace::default(); WORKSPACES],
+            workspaces: [Workspace::starting_at(start); WORKSPACES],
             outputs: Vec::new(),
             focused: None,
             layer_focus: None,
