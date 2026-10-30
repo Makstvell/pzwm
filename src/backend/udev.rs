@@ -44,7 +44,7 @@ use smithay::{
         },
         drm::{
             Device as _,
-            control::{ModeTypeFlags, connector, crtc},
+            control::{Device as _, ModeTypeFlags, connector, crtc},
         },
         input::{DeviceCapability, Libinput},
         rustix::fs::OFlags,
@@ -483,7 +483,37 @@ fn device_changed(state: &mut State, node: DrmNode) {
             _ => {}
         }
     }
+    light_answering_connectors(state, node);
     state.relayout_outputs();
+}
+
+/// A connector left off because no monitor answered stays "connected", so
+/// the scan reports nothing when a monitor is plugged in there: look again.
+fn light_answering_connectors(state: &mut State, node: DrmNode) {
+    let Backend::Udev(data) = &state.backend else {
+        return;
+    };
+    let Some(device) = data.devices.get(&node) else {
+        return;
+    };
+    let unlit: Vec<_> = device
+        .scanner
+        .crtcs()
+        .filter(|(_, crtc)| !device.surfaces.contains_key(crtc))
+        .filter_map(|(info, crtc)| {
+            let fresh = device
+                .manager
+                .device()
+                .get_connector(info.handle(), false)
+                .ok()?;
+            Some((fresh, crtc))
+        })
+        .collect();
+    for (info, crtc) in unlit {
+        if info.state() == connector::State::Connected && !no_monitor_answers(&info) {
+            connector_connected(state, node, info, crtc);
+        }
+    }
 }
 
 fn device_removed(state: &mut State, node: DrmNode) {
@@ -547,6 +577,23 @@ fn pick_mode(
         .copied()
 }
 
+/// An external connector the driver calls connected while nothing answers
+/// on it: only fallback modes, none the monitor prefers. NVIDIA keeps an
+/// unplugged HDMI port "connected" like this.
+fn no_monitor_answers(connector: &connector::Info) -> bool {
+    let internal = matches!(
+        connector.interface(),
+        connector::Interface::EmbeddedDisplayPort
+            | connector::Interface::LVDS
+            | connector::Interface::DSI
+    );
+    !internal
+        && !connector
+            .modes()
+            .iter()
+            .any(|m| m.mode_type().contains(ModeTypeFlags::PREFERRED))
+}
+
 fn connector_connected(
     state: &mut State,
     node: DrmNode,
@@ -562,6 +609,12 @@ fn connector_connected(
     let scale = state.output_scale(&name);
     if output_config.disable {
         info!("output {name} disabled in config");
+        return;
+    }
+    if output_config.mode.is_none() && no_monitor_answers(&connector) {
+        // Left lit, a phantom keeps logind thinking the laptop is docked,
+        // so closing the lid would not suspend it.
+        info!("output {name}: connected, but no monitor answers (no preferred mode); left off");
         return;
     }
     let Backend::Udev(data) = &mut state.backend else {

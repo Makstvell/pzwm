@@ -95,11 +95,14 @@ impl State {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::Area("cancel".into())));
                 }
-                // Any Enter, Super+Return too: picking, it places the window
-                // instead of launching another one.
-                if state.area.selecting && (sym == Keysym::Return || sym == Keysym::KP_Enter) {
-                    state.suppressed_keys.push(keycode);
-                    return FilterResult::Intercept(Some(Action::Area("beside".into())));
+                // Picking: Enter (Super+Return too, instead of launching
+                // another window) puts the window beside the focused one in
+                // reading order; an arrow or h j k l on that side.
+                if state.area.selecting {
+                    if let Some(args) = beside_key(pressed, sym) {
+                        state.suppressed_keys.push(keycode);
+                        return FilterResult::Intercept(Some(Action::Area(args.into())));
+                    }
                 }
                 if state.draw.active && !pressed.logo {
                     if let Some(action) = pen_key(pressed, sym) {
@@ -515,4 +518,21 @@ fn find_bind(config: &Config, mods: Mods, sym: Keysym) -> Option<Action> {
         .iter()
         .find(|k| k.mods == mods && k.sym == sym)
         .map(|k| k.action.clone())
+}
+
+/// Keys that place a window beside the focused one while picking: Enter in
+/// reading order, arrows and vim's h j k l on that side. Ctrl and Alt
+/// combinations stay with their binds.
+fn beside_key(pressed: Mods, sym: Keysym) -> Option<&'static str> {
+    if pressed.ctrl || pressed.alt {
+        return None;
+    }
+    Some(match sym {
+        Keysym::Return | Keysym::KP_Enter => "beside",
+        Keysym::Left | Keysym::h => "beside left",
+        Keysym::Down | Keysym::j => "beside down",
+        Keysym::Up | Keysym::k => "beside up",
+        Keysym::Right | Keysym::l => "beside right",
+        _ => return None,
+    })
 }

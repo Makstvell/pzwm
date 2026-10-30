@@ -62,7 +62,7 @@ line some up on a grid over the screen when you want to (`Super+T`).
 | Mode | What happens when a window opens | Set it |
 |---|---|---|
 | **center** (default) | it appears at once in the middle of the view, 90 % × 90 % of the screen | `new_window_placement = "center"` |
-| **pick** | it waits until you drag out its area with the mouse, then takes exactly that place and size. **Enter** instead puts it beside the focused window at the ideal size; Escape: the middle | `new_window_placement = "pick"` |
+| **pick** | it waits until you drag out its area with the mouse, then takes exactly that place and size. **Enter** instead puts it right next to the focused window at the ideal size, **arrows or h j k l** on that side of it (left, down, up, right); Escape: the middle | `new_window_placement = "pick"` |
 | **beside** | it opens at once at the ideal size right next to the focused window, in the order of window numbers: to the right for rows (`window_numbers = "rows"`), below for `columns`, to the left for `rows-rtl`; windows already there move along to make room | `new_window_placement = "beside"` |
 
 Switch in **pzwm config** → Canvas → *Where new windows open*, or in
@@ -105,7 +105,7 @@ further windows always open by the window they belong to. Details:
 
 | Feature | Keys / option | More |
 |---|---|---|
-| Open a window beside the focused one at the ideal size, in the order of window numbers: always, or with Enter instead of dragging an area | `[canvas] new_window_placement = "beside"`; Enter while picking | [Where new windows open](#where-new-windows-open) |
+| Open a window right next to the focused one at the ideal size, pushing the windows there along: in the order of window numbers (always, or Enter while picking), or on the side you choose with an arrow or h j k l | `[canvas] new_window_placement = "beside"`; Enter, arrows, h j k l while picking | [Where new windows open](#where-new-windows-open) |
 | Idle and sleep built in: dim, screens off, lock, sleep on battery only, lock before any sleep (lid, power menu); a playing video holds it back. Replaces hypridle | `[idle]`; `Super+L` lock, `Super+Shift+Escape` screens off | [Idle, lock and sleep](#idle-lock-and-sleep) |
 | Dark mode for apps: GTK 3 and 4, libadwaita, browsers, Electron, and Qt through qt6ct | `[appearance] color_scheme = "dark"` | [Dark mode](#dark-mode) |
 | Pick where a new window opens: drag out its area and it takes exactly that area | `Super+O`, `Super+Ctrl` + left drag, `Super+Shift+Return`; every window: `[canvas] new_window_placement = "pick"` | [Where new windows open](#where-new-windows-open) |
@@ -294,8 +294,8 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 
 | Window | Opens |
 |---|---|
-| after you picked an area | filling the area: `Super+O`, then drag a rectangle (Enter: beside the focused window instead, Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
-| any other window, with `new_window_placement = "pick"` | nowhere yet: it waits until you drag out its area (the cursor is a crosshair) and then takes exactly that area, size included; a click without dragging keeps it waiting; **Enter** puts it beside the focused window at the ideal size (as in `"beside"`); Escape puts it in the middle of the view. Several new windows wait in turn |
+| after you picked an area | filling the area: `Super+O`, then drag a rectangle (Enter, arrows or h j k l: beside the focused window instead, Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
+| any other window, with `new_window_placement = "pick"` | nowhere yet: it waits until you drag out its area (the cursor is a crosshair) and then takes exactly that area, size included; a click without dragging keeps it waiting; **Enter** puts it right next to the focused window at the ideal size (as in `"beside"`), and an **arrow or h j k l** puts it on that side (left, down, up, right; windows there move along); Escape puts it in the middle of the view. Several new windows wait in turn |
 | any other window, with `new_window_placement = "beside"` | at once, at the [ideal size](#size-hints), next to the focused window: the next place in the order of [window numbers](#window-numbers), so to the right for `rows` and `opened`, below for `columns`, to the left for `rows-rtl`, right against it (a gap apart, top edges in line). Windows already there, and the ones after them in that row, move along to make room. The camera moves to it at the zoom you have. With no window to go beside: the middle of the view |
 | a dialog (it has a parent window) | centered over its parent; the camera fits it, at most at 100 % |
 | a further window an app opens by itself (the same process as a window on the workspace, and you launched nothing just before) | beside that window (right, else below, left, above: the first free side), and the camera fits it, at most at 100 %; a window at most 60 % of the other one's size opens over it, like a dialog. A window you launch (a bind, the launcher, `pzwm msg spawn`, within 20 s) or a new process of the same app is yours and opens like any new window |
@@ -305,6 +305,8 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
   canvas until then. Dialogs and fixed-size windows do not take it.
 - Window rules with a `position` or `size` still apply; a picked area wins
   over them.
+- A left click on the bare canvas unfocuses the window; then Enter (and
+  `"beside"`) has nothing to go beside and opens the window in the middle.
 - Side by side placement is on by default; `[canvas] place_near_siblings =
   false` turns it off.
 - Picking an area never changes the zoom: you drag at the view you have.
@@ -931,7 +933,7 @@ the reply. Any [action](#configuration-file) works as a request.
 | `pzwm msg bookmark list`, `group list` | bookmarks and groups with their workspace |
 | `pzwm msg heads --json` | every connected monitor (also disabled ones) with the modes it offers |
 | `pzwm msg dpms off\|on\|toggle`, `pzwm msg lock` | screens off or on, lock the session (for scripts and other idle daemons) |
-| `pzwm msg area beside` | while an area is being picked: beside the focused window, like Enter |
+| `pzwm msg area beside [left\|right\|up\|down]` | while an area is being picked: beside the focused window, like Enter or an arrow |
 | `pzwm reload` | re-read the config |
 | `pzwm --check-config [FILE]` | check the config (or another file) for errors |
 | `pzwm --print-default-config` | print the documented defaults |
@@ -1007,6 +1009,7 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | Window numbers are not in the order I expect | Set `[general] window_numbers` to `rows`, `rows-rtl`, `columns` or `opened` |
 | Apps open in light mode | Set `[appearance] color_scheme = "dark"`. Qt apps (Dolphin, KDE apps) also need a platform theme: install `qt6ct`, pick a dark color scheme in it and log in again (pzwm sets `QT_QPA_PLATFORMTHEME=qt6ct`). In Chrome choose Settings → Appearance → Mode: Device |
 | The screen dims or locks twice, or `hyprctl` errors in the log | hypridle (or swayidle) still runs from `autostart`: remove it, pzwm's `[idle]` does the same |
+| Closing the lid does not suspend | logind ignores the lid while an external display counts as connected (`busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager Docked` says `true`). pzwm leaves an output off when no monitor answers on it (NVIDIA keeps an unplugged HDMI port "connected"), so it does not count; a real monitor plugged in there lights up as usual. To sleep on the lid even with a monitor: `HandleLidSwitchDocked=suspend` in `/etc/systemd/logind.conf.d/` |
 | The laptop does not lock before sleep | It needs `gdbus` (glib2) and `systemd-inhibit`; `journalctl --user -t pzwm -b \| grep -i sleep` shows what happened |
 | Config changes are ignored | `pzwm --check-config` shows the error; pzwm keeps the old settings until it is fixed |
 | No bar after login | `systemctl --user add-wants pzwm-session.target dms.service`, then log in again |

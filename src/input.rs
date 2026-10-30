@@ -648,6 +648,10 @@ impl State {
                         let _ = self.group_toggle(Some(&name));
                         return;
                     }
+                    // A click on the bare canvas leaves no window focused.
+                    if self.focused.is_some() {
+                        self.focus_window(None);
+                    }
                 }
                 let pans = button == BTN_MIDDLE
                     || (button == BTN_LEFT && self.config.canvas.left_drag_pans);

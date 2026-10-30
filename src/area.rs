@@ -29,7 +29,7 @@ use smithay::{
     utils::{Logical, Point, Rectangle, Size},
 };
 
-use crate::{canvas::Camera, numbering::Numbering, shell::Placement, state::State};
+use crate::{action::Dir, canvas::Camera, numbering::Numbering, shell::Placement, state::State};
 
 /// How long a picked area waits for its window.
 pub const AREA_TIMEOUT: Duration = Duration::from_secs(60);
@@ -104,43 +104,50 @@ pub fn beside(
 /// A window moved along to make room: its id and how far.
 pub type Push = (u64, Point<f64, Logical>);
 
-/// Where a frame of `size` goes right next to `anchor` in reading order
-/// (right of it for rows, left for rows-rtl, below for columns), and how
+/// The side a new window goes on in reading order: right of the anchor
+/// for rows, left for rows-rtl, below for columns.
+pub fn reading_side(how: Numbering) -> Dir {
+    match how {
+        Numbering::Rows | Numbering::Opened => Dir::Right,
+        Numbering::RowsRtl => Dir::Left,
+        Numbering::Columns => Dir::Down,
+    }
+}
+
+/// Where a frame of `size` goes right next to `anchor` on `side`, and how
 /// far each of `others` (id, frame) in its way moves along so it fits:
-/// the windows that follow in that row (column) are pushed on, each as
-/// far as needed, keeping the gaps that were already wide enough.
-pub fn insert_in_order(
+/// the windows that follow on that side, in the same row (column), are
+/// pushed on, each as far as needed, keeping gaps that were wide enough.
+pub fn insert_beside(
     anchor: Rectangle<f64, Logical>,
     size: Size<f64, Logical>,
     others: &[(u64, Rectangle<f64, Logical>)],
     gap: f64,
-    how: Numbering,
+    side: Dir,
 ) -> (Point<f64, Logical>, Vec<Push>) {
-    let a = anchor;
-    // Work as if along +x: columns swap the axes, rows-rtl mirrors them.
+    // Work as if going right (+x): the other sides turn or mirror the axes.
     let flip = |r: Rectangle<f64, Logical>| -> Rectangle<f64, Logical> {
-        match how {
-            Numbering::Rows | Numbering::Opened => r,
-            Numbering::RowsRtl => Rectangle::new((-r.loc.x - r.size.w, r.loc.y).into(), r.size),
-            Numbering::Columns => {
-                Rectangle::new((r.loc.y, r.loc.x).into(), (r.size.h, r.size.w).into())
-            }
-        }
+        let (x, y, w, h) = (r.loc.x, r.loc.y, r.size.w, r.size.h);
+        let (x, y, w, h) = match side {
+            Dir::Right => (x, y, w, h),
+            Dir::Left => (-x - w, y, w, h),
+            Dir::Down => (y, x, h, w),
+            Dir::Up => (-y - h, x, h, w),
+        };
+        Rectangle::new((x, y).into(), (w, h).into())
     };
     let unflip_delta = |d: f64| -> Point<f64, Logical> {
-        match how {
-            Numbering::Rows | Numbering::Opened => (d, 0.0).into(),
-            Numbering::RowsRtl => (-d, 0.0).into(),
-            Numbering::Columns => (0.0, d).into(),
+        match side {
+            Dir::Right => (d, 0.0).into(),
+            Dir::Left => (-d, 0.0).into(),
+            Dir::Down => (0.0, d).into(),
+            Dir::Up => (0.0, -d).into(),
         }
     };
-    let fa = flip(a);
-    let fnew = flip(Rectangle::new(a.loc, size));
-    let new = Rectangle::new(
-        Point::from((fa.loc.x + fa.size.w + gap, fa.loc.y)),
-        fnew.size,
-    );
-    // The windows after the anchor that share the new window's row.
+    let fa = flip(anchor);
+    let fsize = flip(Rectangle::new(anchor.loc, size)).size;
+    let new = Rectangle::new(Point::from((fa.loc.x + fa.size.w + gap, fa.loc.y)), fsize);
+    // The windows past the anchor that share the new window's row.
     let mut row: Vec<(u64, Rectangle<f64, Logical>)> = others
         .iter()
         .map(|&(id, r)| (id, flip(r)))
@@ -162,12 +169,14 @@ pub fn insert_in_order(
         edge = r.loc.x + d + r.size.w + gap;
     }
     // Back to canvas coordinates.
-    let loc = match how {
-        Numbering::Rows | Numbering::Opened => new.loc,
-        Numbering::RowsRtl => (-new.loc.x - new.size.w, new.loc.y).into(),
-        Numbering::Columns => (new.loc.y, new.loc.x).into(),
+    let (x, y, w) = (new.loc.x, new.loc.y, new.size.w);
+    let loc = match side {
+        Dir::Right => (x, y),
+        Dir::Left => (-x - w, y),
+        Dir::Down => (y, x),
+        Dir::Up => (y, -x - w),
     };
-    (loc, moves)
+    (loc.into(), moves)
 }
 
 /// Parses `X,Y WxH` (canvas units) for `area rect`.
@@ -187,7 +196,13 @@ impl State {
         let (verb, rest) = args.split_once(char::is_whitespace).unwrap_or((args, ""));
         match verb {
             "" | "pick" => self.begin_area_pick(None),
-            "beside" => self.area_beside(),
+            "beside" => {
+                let side = match rest.trim() {
+                    "" => None,
+                    s => Some(Dir::parse(s).ok_or("usage: area beside [left|right|up|down]")?),
+                };
+                self.area_beside(side)
+            }
             "spawn" if !rest.trim().is_empty() => self.begin_area_pick(Some(rest.trim().into())),
             "cancel" => {
                 self.cancel_area();
@@ -210,7 +225,7 @@ impl State {
                 self.set_pending_area(ws, rect);
                 Ok("the next window opens in the area".into())
             }
-            _ => Err("usage: area [spawn CMD] | beside | cancel | rect X,Y WxH".into()),
+            _ => Err("usage: area [spawn CMD] | beside [SIDE] | cancel | rect X,Y WxH".into()),
         }
     }
 
@@ -219,7 +234,7 @@ impl State {
         self.area.spawn = spawn;
         self.cursor_override = Some(CursorIcon::Crosshair);
         self.queue_redraw_all();
-        Ok("drag an area for the next window (Enter: beside the focused one, Esc cancels)".into())
+        Ok("drag an area for the next window (Enter, arrows, h j k l: beside the focused one; Esc cancels)".into())
     }
 
     /// Escape / `area cancel`: drops the pick and a waiting area; a window
@@ -301,7 +316,7 @@ impl State {
                 "notify-send -a pzwm -t 4000 \
                  -h string:x-canonical-private-synchronous:pzwm-pick {} {}",
                 quote(&format!("Place {app}")),
-                quote("Drag out its area · Enter: beside the focused window · Esc: the middle"),
+                quote("Drag out its area · Enter, arrows or h j k l: beside the focused window · Esc: the middle"),
             ));
             self.queue_redraw_all();
             return;
@@ -335,18 +350,19 @@ impl State {
         self.queue_redraw_all();
     }
 
-    /// Enter while picking (`area beside`): instead of a dragged area, the
-    /// ideal size beside the focused window. Places the window waiting for
-    /// its place, or keeps the area for the next window (and starts the
-    /// command of `area spawn`).
-    fn area_beside(&mut self) -> Result<String, String> {
+    /// Enter, an arrow or h j k l while picking (`area beside [SIDE]`):
+    /// instead of a dragged area, the ideal size beside the focused window,
+    /// on `side` (Enter: the reading order of window numbers). Places the
+    /// window waiting for its place, or keeps the area for the next window
+    /// (and starts the command of `area spawn`).
+    fn area_beside(&mut self, side: Option<Dir>) -> Result<String, String> {
         if !self.area.selecting {
             return Err("not picking an area".into());
         }
         let output = self.active_output().ok_or("no output")?;
         let ws = self.output_ws(&output);
         let waiting = self.area.window;
-        let Some(rect) = self.beside_focused(&output, ws, waiting) else {
+        let Some(rect) = self.beside_focused(&output, ws, waiting, side) else {
             // Nothing focused to go beside: the middle, as with Escape.
             self.cancel_area();
             return Ok("nothing focused: the middle of the view".into());
@@ -381,9 +397,10 @@ impl State {
             .find(|o| self.output_ws(o) == ws)
             .cloned()
             .or_else(|| self.active_output());
-        let rect = output
-            .as_ref()
-            .and_then(|o| self.beside_focused(o, ws, Some(id)).map(|r| (o.clone(), r)));
+        let rect = output.as_ref().and_then(|o| {
+            self.beside_focused(o, ws, Some(id), None)
+                .map(|r| (o.clone(), r))
+        });
         match rect {
             Some((output, rect)) => {
                 self.center_on_rect(&output, ws, rect);
@@ -397,14 +414,15 @@ impl State {
     }
 
     /// Frame of the ideal size right next to the focused window on `ws`,
-    /// in the reading order of window numbers; the windows in its way are
-    /// pushed along. `None` without a canvas window to go beside. `skip` is
-    /// the window being placed.
+    /// on `side` or else in the reading order of window numbers; the
+    /// windows in its way are pushed along. `None` without a canvas window
+    /// to go beside. `skip` is the window being placed.
     fn beside_focused(
         &mut self,
         output: &Output,
         ws: usize,
         skip: Option<u64>,
+        side: Option<Dir>,
     ) -> Option<Rectangle<f64, Logical>> {
         let usable = |o: &&crate::shell::Managed| {
             Some(o.id) != skip
@@ -415,13 +433,16 @@ impl State {
                 && o.ws == ws
                 && o.placement == Placement::Canvas
         };
-        // The focused window, else the one focused last (windows are kept
-        // in focus order).
+        // The focused window. Nothing focused (a click on the bare canvas):
+        // nothing to go beside. Focus on a window that cannot be the anchor
+        // (the one being placed): the one focused before it, as windows
+        // are kept in focus order.
+        let focused = self.focused.as_ref()?;
         let anchor = self
             .windows
             .iter()
             .filter(usable)
-            .find(|o| self.focused.as_ref() == Some(&o.window))
+            .find(|o| &o.window == focused)
             .or_else(|| self.windows.iter().find(usable))?;
         let anchor_id = anchor.id;
         let anchor = self.canvas_frame(anchor);
@@ -434,7 +455,8 @@ impl State {
             .map(|o| (o.id, self.canvas_frame(o)))
             .collect();
         let gap = (self.config.appearance.gaps as f64).max(MIN_SIBLING_GAP);
-        let (loc, moves) = insert_in_order(anchor, size, &others, gap, self.numbering());
+        let side = side.unwrap_or_else(|| reading_side(self.numbering()));
+        let (loc, moves) = insert_beside(anchor, size, &others, gap, side);
         for (id, delta) in moves {
             if let Some(idx) = self.index_of_id(id) {
                 self.windows[idx].pos += delta;
@@ -726,7 +748,7 @@ mod tests {
     #[test]
     fn rows_open_right_next_to_the_anchor() {
         let anchor = rect(0.0, 0.0, 1000.0, 600.0);
-        let (p, moves) = insert_in_order(anchor, (800.0, 600.0).into(), &[], 20.0, Numbering::Rows);
+        let (p, moves) = insert_beside(anchor, (800.0, 600.0).into(), &[], 20.0, Dir::Right);
         assert_eq!(p, Point::from((1020.0, 0.0)));
         assert!(moves.is_empty());
     }
@@ -739,13 +761,7 @@ mod tests {
         let far = rect(9000.0, 0.0, 500.0, 600.0);
         let other_row = rect(1020.0, 2000.0, 500.0, 600.0);
         let others = [(1, next), (2, after), (3, far), (4, other_row)];
-        let (p, moves) = insert_in_order(
-            anchor,
-            (800.0, 600.0).into(),
-            &others,
-            20.0,
-            Numbering::Rows,
-        );
+        let (p, moves) = insert_beside(anchor, (800.0, 600.0).into(), &others, 20.0, Dir::Right);
         assert_eq!(p, Point::from((1020.0, 0.0)));
         // The new window ends at 1820: next moves to 1840, after to 2360;
         // far and the other row stay.
@@ -763,13 +779,36 @@ mod tests {
         let anchor = rect(0.0, 0.0, 1000.0, 600.0);
         let size: Size<f64, Logical> = (1000.0, 500.0).into();
         let below = rect(0.0, 620.0, 1000.0, 600.0);
-        let (p, moves) = insert_in_order(anchor, size, &[(1, below)], 20.0, Numbering::Columns);
+        let (p, moves) = insert_beside(
+            anchor,
+            size,
+            &[(1, below)],
+            20.0,
+            reading_side(Numbering::Columns),
+        );
         assert_eq!(p, Point::from((0.0, 620.0)));
         assert_eq!(moves, vec![(1, Point::from((0.0, 520.0)))]);
         let left = rect(-820.0, 0.0, 800.0, 600.0);
-        let (p, moves) = insert_in_order(anchor, size, &[(2, left)], 20.0, Numbering::RowsRtl);
+        let (p, moves) = insert_beside(
+            anchor,
+            size,
+            &[(2, left)],
+            20.0,
+            reading_side(Numbering::RowsRtl),
+        );
         assert_eq!(p, Point::from((-1020.0, 0.0)));
         assert_eq!(moves, vec![(2, Point::from((-1020.0, 0.0)))]);
+    }
+
+    #[test]
+    fn up_goes_above_and_pushes_the_column_up() {
+        let anchor = rect(0.0, 0.0, 1000.0, 600.0);
+        let above = rect(0.0, -620.0, 1000.0, 600.0);
+        let (p, moves) =
+            insert_beside(anchor, (1000.0, 500.0).into(), &[(1, above)], 20.0, Dir::Up);
+        assert_eq!(p, Point::from((0.0, -520.0)));
+        // The window above moves up by the new window's height and gap.
+        assert_eq!(moves, vec![(1, Point::from((0.0, -520.0)))]);
     }
 
     #[test]

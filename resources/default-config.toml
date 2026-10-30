@@ -84,7 +84,8 @@ place_near_siblings = true
 # Where any other new window opens:
 #   "center"  the middle of the view;
 #   "pick"    it waits until you drag out its area and takes exactly that
-#             area (Enter: beside the focused window, Escape: the middle);
+#             area (Enter: beside the focused window in the order below,
+#             arrows or h j k l: on that side of it; Escape: the middle);
 #   "beside"  at the ideal size right next to the focused window, in the
 #             order of [general] window_numbers: right for rows, below for
 #             columns, left for rows-rtl; windows already there move along.
@@ -386,8 +387,8 @@ locked_screen_off_after = 60          # once locked, screens off after 1 min
 # Draw on the canvas; show or hide the drawings.
 "Super+Shift+D" = "draw"
 "Super+Alt+D" = "draw hide"
-# Pick an area with the mouse: the next window opens there (Enter: beside
-# the focused window at the ideal size, Esc cancels).
+# Pick an area with the mouse: the next window opens there (Enter, arrows
+# or h j k l: beside the focused window at the ideal size; Esc cancels).
 "Super+O" = "area"
 # Put the window on cells of a grid: drag across them, or arrows,
 # Shift+arrows and Enter.
