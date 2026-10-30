@@ -296,7 +296,7 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 |---|---|
 | after you picked an area | filling the area: `Super+O`, then drag a rectangle (Enter, arrows or h j k l: beside the focused window instead, Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
 | any other window, with `new_window_placement = "pick"` | nowhere yet: it waits until you drag out its area (the cursor is a crosshair) and then takes exactly that area, size included; a click without dragging keeps it waiting; **Enter** puts it right next to the focused window at the ideal size (as in `"beside"`), and an **arrow or h j k l** puts it on that side (left, down, up, right; windows there move along); Escape puts it in the middle of the view. Several new windows wait in turn |
-| any other window, with `new_window_placement = "beside"` | at once, at the [ideal size](#size-hints), next to the focused window: the next place in the order of [window numbers](#window-numbers), so to the right for `rows` and `opened`, below for `columns`, to the left for `rows-rtl`, right against it (a gap apart, top edges in line). Windows already there, and the ones after them in that row, move along to make room. The camera moves to it at the zoom you have. With no window to go beside: the middle of the view |
+| any other window, with `new_window_placement = "beside"` | at once, at the [ideal size](#size-hints), next to the focused window: the next place in the order of [window numbers](#window-numbers), so to the right for `rows` and `opened`, below for `columns`, to the left for `rows-rtl`, right against it (a gap apart, top edges in line). Windows already there, and the ones after them in that row, move along to make room. The camera moves to it at the zoom you have. With no window to go beside: the middle of the view, at the ideal size too |
 | a dialog (it has a parent window) | centered over its parent; the camera fits it, at most at 100 % |
 | a further window an app opens by itself (the same process as a window on the workspace, and you launched nothing just before) | beside that window (right, else below, left, above: the first free side), and the camera fits it, at most at 100 %; a window at most 60 % of the other one's size opens over it, like a dialog. A window you launch (a bind, the launcher, `pzwm msg spawn`, within 20 s) or a new process of the same app is yours and opens like any new window |
 | anything else (`new_window_placement = "center"`, the default) | in the middle of the view, 90 % × 90 % of the screen |
@@ -306,7 +306,8 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 - Window rules with a `position` or `size` still apply; a picked area wins
   over them.
 - A left click on the bare canvas unfocuses the window; then Enter (and
-  `"beside"`) has nothing to go beside and opens the window in the middle.
+  `"beside"`) has nothing to go beside and opens the window in the middle
+  of the view, still at the ideal size.
 - Side by side placement is on by default; `[canvas] place_near_siblings =
   false` turns it off.
 - Picking an area never changes the zoom: you drag at the view you have.

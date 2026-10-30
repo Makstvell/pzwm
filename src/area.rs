@@ -362,10 +362,14 @@ impl State {
         let output = self.active_output().ok_or("no output")?;
         let ws = self.output_ws(&output);
         let waiting = self.area.window;
-        let Some(rect) = self.beside_focused(&output, ws, waiting, side) else {
-            // Nothing focused to go beside: the middle, as with Escape.
+        // Nothing focused to go beside: the middle of the view, still at
+        // the ideal size.
+        let Some(rect) = self
+            .beside_focused(&output, ws, waiting, side)
+            .or_else(|| self.ideal_in_view(&output, ws))
+        else {
             self.cancel_area();
-            return Ok("nothing focused: the middle of the view".into());
+            return Ok("the middle of the view".into());
         };
         self.area.selecting = false;
         if self.interaction.is_none() {
@@ -399,6 +403,7 @@ impl State {
             .or_else(|| self.active_output());
         let rect = output.as_ref().and_then(|o| {
             self.beside_focused(o, ws, Some(id), None)
+                .or_else(|| self.ideal_in_view(o, ws))
                 .map(|r| (o.clone(), r))
         });
         match rect {
@@ -463,6 +468,22 @@ impl State {
             }
         }
         Some(Rectangle::new(loc, size))
+    }
+
+    /// Frame of the ideal size in the middle of what `ws` shows on `output`.
+    fn ideal_in_view(&self, output: &Output, ws: usize) -> Option<Rectangle<f64, Logical>> {
+        let size = self.ideal_sizes(output).first()?.size;
+        let view = self
+            .workspace(ws)
+            .target()
+            .visible(self.usable_area(output).to_f64());
+        Some(Rectangle::new(
+            Point::from((
+                view.loc.x + (view.size.w - size.w) / 2.0,
+                view.loc.y + (view.size.h - size.h) / 2.0,
+            )),
+            size,
+        ))
     }
 
     /// Moves the camera of `ws` (at its zoom) so `rect` is in the middle.
