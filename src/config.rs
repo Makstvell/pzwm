@@ -33,6 +33,7 @@ pub struct Config {
     pub appearance: Appearance,
     pub minimap: Minimap,
     pub scratchpad: Scratchpad,
+    pub idle: Idle,
     #[serde(rename = "output")]
     pub outputs: Vec<OutputConfig>,
     #[serde(rename = "rule")]
@@ -148,8 +149,9 @@ pub struct Canvas {
     /// A new window of an app that already has one on the workspace opens
     /// beside it (dialog-sized ones over it) instead of in the middle.
     pub place_near_siblings: bool,
-    /// Where a new window opens: "center" (the middle of the view) or
-    /// "pick" (drag out its place first, see area.rs).
+    /// Where a new window opens: "center" (the middle of the view),
+    /// "pick" (drag out its place first, see area.rs) or "beside" (ideal
+    /// size next to the focused window).
     pub new_window_placement: String,
     /// Cells of the `tile` grid, "COLSxROWS".
     pub tile_grid: String,
@@ -274,6 +276,51 @@ pub struct Appearance {
     pub titlebar_active_color: [f32; 4],
     #[serde(deserialize_with = "de_color")]
     pub pinned_accent: [f32; 4],
+    /// Light or dark apps: "dark", "light", or "system" (leave it alone).
+    pub color_scheme: String,
+    /// `QT_QPA_PLATFORMTHEME` for Qt apps: "auto" (qt6ct when installed),
+    /// a name, or "" to leave it alone.
+    pub qt_platform_theme: String,
+}
+
+/// Dimming, screens off, locking and sleep when nothing happens; see idle.rs.
+/// Times are seconds of no input; 0 turns a step off.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct Idle {
+    pub enabled: bool,
+    pub dim_after: u64,
+    pub dim_command: String,
+    pub undim_command: String,
+    pub screen_off_after: u64,
+    pub lock_after: u64,
+    /// "auto": the DankMaterialShell lock, else hyprlock, else swaylock.
+    pub lock_command: String,
+    pub suspend_after: u64,
+    /// Also sleep on AC power (by default only on battery).
+    pub suspend_on_ac: bool,
+    /// Lock before any sleep: idle, lid, power menu, `systemctl suspend`.
+    pub lock_before_sleep: bool,
+    /// Once locked, turn the screens off after this long.
+    pub locked_screen_off_after: u64,
+}
+
+impl Default for Idle {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            dim_after: 480,
+            dim_command: "brightnessctl -s set 10%".into(),
+            undim_command: "brightnessctl -r".into(),
+            screen_off_after: 660,
+            lock_after: 900,
+            lock_command: "auto".into(),
+            suspend_after: 1800,
+            suspend_on_ac: false,
+            lock_before_sleep: true,
+            locked_screen_off_after: 60,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -376,6 +423,7 @@ impl Default for Config {
             appearance: Appearance::default(),
             minimap: Minimap::default(),
             scratchpad: Scratchpad::default(),
+            idle: Idle::default(),
             outputs: Vec::new(),
             rules: Vec::new(),
             binds: HashMap::new(),
@@ -545,6 +593,8 @@ impl Default for Appearance {
             titlebar_color: rgba(0x14161dff),
             titlebar_active_color: rgba(0x1b1e29ff),
             pinned_accent: rgba(0xf59e0bff),
+            color_scheme: "system".into(),
+            qt_platform_theme: "auto".into(),
         }
     }
 }

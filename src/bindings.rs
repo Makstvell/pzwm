@@ -95,6 +95,13 @@ impl State {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::Area("cancel".into())));
                 }
+                if state.area.selecting
+                    && (sym == Keysym::Return || sym == Keysym::KP_Enter)
+                    && !pressed.logo
+                {
+                    state.suppressed_keys.push(keycode);
+                    return FilterResult::Intercept(Some(Action::Area("beside".into())));
+                }
                 if state.draw.active && !pressed.logo {
                     if let Some(action) = pen_key(pressed, sym) {
                         state.suppressed_keys.push(keycode);
@@ -192,6 +199,11 @@ impl State {
                 let result = self.area_command(&args);
                 self.notify_result("area", result, false);
             }
+            Action::Dpms(arg) => {
+                let result = self.dpms_command(&arg);
+                self.notify_result("dpms", result, false);
+            }
+            Action::Lock => self.lock_session(),
             Action::IdealSize => {
                 if let Some(i) = focused {
                     self.ideal_size(i);
@@ -361,6 +373,7 @@ impl State {
         // The file is the truth again: runtime monitor changes are dropped.
         self.output_overrides.clear();
         crate::backend::reapply_outputs(self);
+        self.apply_color_scheme();
         self.queue_redraw_all();
         info!("config reloaded");
         Ok(())

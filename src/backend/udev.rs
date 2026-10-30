@@ -831,9 +831,34 @@ fn render(state: &mut State, output: &Output) {
     let _ = state.display_handle.flush_clients();
 }
 
+/// Turns the screens off (planes cleared, DPMS off) or lets the next
+/// frame turn them on again with a full repaint.
+pub fn set_screens_power(state: &mut State, on: bool) {
+    let Backend::Udev(data) = &mut state.backend else {
+        return;
+    };
+    let mut timers = Vec::new();
+    for device in data.devices.values_mut() {
+        for surface in device.surfaces.values_mut() {
+            if on {
+                surface.drm_output.reset_buffers();
+            } else {
+                if let Err(err) = surface.drm_output.with_compositor(|c| c.clear()) {
+                    warn!("screen off on {}: {err}", surface.output.name());
+                }
+                timers.extend(surface.vblank_timer.take());
+                output_state(&surface.output).redraw = RedrawState::Idle;
+            }
+        }
+    }
+    for token in timers {
+        state.loop_handle.remove(token);
+    }
+}
+
 /// Some(true) when a frame was queued, Some(false) when there was no damage.
 fn render_inner(state: &mut State, data: &mut UdevData, output: &Output) -> Option<bool> {
-    if !data.session.is_active() {
+    if !data.session.is_active() || state.idle.screens_off {
         return None;
     }
     let primary_gpu = data.primary_gpu;

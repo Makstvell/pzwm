@@ -6,7 +6,12 @@
 //!   Super+Ctrl + left drag): the next window that opens fills it;
 //! - with `[canvas] new_window_placement = "pick"` every new window waits,
 //!   hidden, until its area is dragged out and then takes exactly that
-//!   area (Escape: the middle of the view);
+//!   area (Escape: the middle of the view; Enter: beside the focused
+//!   window, see below);
+//! - **beside the focused window** at the ideal size (Enter while picking,
+//!   or always with `new_window_placement = "beside"`): the next free
+//!   place in the reading order of `[general] window_numbers`, to the right
+//!   for rows, below for columns, to the left for rows-rtl;
 //! - next to a **sibling**: a window an app opens by itself, while it
 //!   already has one on the workspace (same process, nothing launched by
 //!   the user just before), opens beside it (small ones over it) and the
@@ -23,7 +28,7 @@ use smithay::{
     utils::{Logical, Point, Rectangle, Size},
 };
 
-use crate::{shell::Placement, state::State};
+use crate::{canvas::Camera, numbering::Numbering, shell::Placement, state::State};
 
 /// How long a picked area waits for its window.
 pub const AREA_TIMEOUT: Duration = Duration::from_secs(60);
@@ -95,6 +100,40 @@ pub fn beside(
         .unwrap_or(candidates[0])
 }
 
+/// Most windows stepped over looking for a free place in reading order.
+const MAX_STEPS: usize = 64;
+
+/// Top-left of a frame of `size` next to `anchor` in reading order:
+/// right of it for rows (left for rows-rtl, below for columns), past any
+/// of `others` in the way.
+pub fn next_in_order(
+    anchor: Rectangle<f64, Logical>,
+    size: Size<f64, Logical>,
+    others: &[Rectangle<f64, Logical>],
+    gap: f64,
+    how: Numbering,
+) -> Point<f64, Logical> {
+    let a = anchor;
+    let mut p: Point<f64, Logical> = match how {
+        Numbering::Rows | Numbering::Opened => (a.loc.x + a.size.w + gap, a.loc.y).into(),
+        Numbering::RowsRtl => (a.loc.x - gap - size.w, a.loc.y).into(),
+        Numbering::Columns => (a.loc.x, a.loc.y + a.size.h + gap).into(),
+    };
+    for _ in 0..MAX_STEPS {
+        let r = Rectangle::new(p, size);
+        let Some(o) = others.iter().find(|o| o.overlaps(r)) else {
+            break;
+        };
+        // Step past the window in the way, keeping the row (column).
+        match how {
+            Numbering::Rows | Numbering::Opened => p.x = o.loc.x + o.size.w + gap,
+            Numbering::RowsRtl => p.x = o.loc.x - gap - size.w,
+            Numbering::Columns => p.y = o.loc.y + o.size.h + gap,
+        }
+    }
+    p
+}
+
 /// Parses `X,Y WxH` (canvas units) for `area rect`.
 fn parse_rect(arg: &str) -> Option<Rectangle<f64, Logical>> {
     let (pos, size) = arg.trim().split_once(char::is_whitespace)?;
@@ -112,6 +151,7 @@ impl State {
         let (verb, rest) = args.split_once(char::is_whitespace).unwrap_or((args, ""));
         match verb {
             "" | "pick" => self.begin_area_pick(None),
+            "beside" => self.area_beside(),
             "spawn" if !rest.trim().is_empty() => self.begin_area_pick(Some(rest.trim().into())),
             "cancel" => {
                 self.cancel_area();
@@ -134,7 +174,7 @@ impl State {
                 self.set_pending_area(ws, rect);
                 Ok("the next window opens in the area".into())
             }
-            _ => Err("usage: area [spawn CMD] | cancel | rect X,Y WxH".into()),
+            _ => Err("usage: area [spawn CMD] | beside | cancel | rect X,Y WxH".into()),
         }
     }
 
@@ -143,7 +183,7 @@ impl State {
         self.area.spawn = spawn;
         self.cursor_override = Some(CursorIcon::Crosshair);
         self.queue_redraw_all();
-        Ok("drag an area for the next window (Esc cancels)".into())
+        Ok("drag an area for the next window (Enter: beside the focused one, Esc cancels)".into())
     }
 
     /// Escape / `area cancel`: drops the pick and a waiting area; a window
@@ -225,7 +265,7 @@ impl State {
                 "notify-send -a pzwm -t 4000 \
                  -h string:x-canonical-private-synchronous:pzwm-pick {} {}",
                 quote(&format!("Place {app}")),
-                quote("Drag out its area · Esc: the middle"),
+                quote("Drag out its area · Enter: beside the focused window · Esc: the middle"),
             ));
             self.queue_redraw_all();
             return;
@@ -257,6 +297,114 @@ impl State {
         let window = self.windows[idx].window.clone();
         self.focus_window(Some(window));
         self.queue_redraw_all();
+    }
+
+    /// Enter while picking (`area beside`): instead of a dragged area, the
+    /// ideal size beside the focused window. Places the window waiting for
+    /// its place, or keeps the area for the next window (and starts the
+    /// command of `area spawn`).
+    fn area_beside(&mut self) -> Result<String, String> {
+        if !self.area.selecting {
+            return Err("not picking an area".into());
+        }
+        let output = self.active_output().ok_or("no output")?;
+        let ws = self.output_ws(&output);
+        let waiting = self.area.window;
+        let Some(rect) = self.beside_focused(&output, ws, waiting) else {
+            // Nothing focused to go beside: the middle, as with Escape.
+            self.cancel_area();
+            return Ok("nothing focused: the middle of the view".into());
+        };
+        self.area.selecting = false;
+        if self.interaction.is_none() {
+            self.cursor_override = None;
+        }
+        self.center_on_rect(&output, ws, rect);
+        if let Some(id) = self.area.window.take() {
+            self.show_picked(id, Some((ws, rect)));
+            self.pick_next_window();
+            return Ok("placed beside the focused window".into());
+        }
+        self.set_pending_area(ws, rect);
+        if let Some(cmd) = self.area.spawn.take() {
+            self.note_user_launch();
+            self.spawn(&cmd);
+        }
+        Ok("the next window opens beside the focused one".into())
+    }
+
+    /// `new_window_placement = "beside"`: a new window opens at the ideal
+    /// size beside the focused one, or stays where map_window put it when
+    /// nothing is focused.
+    pub fn place_beside(&mut self, idx: usize) {
+        let id = self.windows[idx].id;
+        let ws = self.windows[idx].ws;
+        let output = self
+            .outputs
+            .iter()
+            .find(|o| self.output_ws(o) == ws)
+            .cloned()
+            .or_else(|| self.active_output());
+        let rect = output
+            .as_ref()
+            .and_then(|o| self.beside_focused(o, ws, Some(id)).map(|r| (o.clone(), r)));
+        match rect {
+            Some((output, rect)) => {
+                self.center_on_rect(&output, ws, rect);
+                self.show_picked(id, Some((ws, rect)));
+            }
+            None => {
+                let window = self.windows[idx].window.clone();
+                self.focus_window(Some(window));
+            }
+        }
+    }
+
+    /// Frame of the ideal size next to the focused window on `ws`, in the
+    /// reading order of window numbers; `None` without a focused canvas
+    /// window there. `skip` is the window being placed.
+    fn beside_focused(
+        &self,
+        output: &Output,
+        ws: usize,
+        skip: Option<u64>,
+    ) -> Option<Rectangle<f64, Logical>> {
+        let usable = |o: &&crate::shell::Managed| {
+            Some(o.id) != skip
+                && o.mapped
+                && !o.hidden
+                && !o.awaiting_pick
+                && !o.scratchpad
+                && o.ws == ws
+                && o.placement == Placement::Canvas
+        };
+        let focused = self.focused.as_ref()?;
+        let anchor = self
+            .windows
+            .iter()
+            .filter(usable)
+            .find(|o| &o.window == focused)?;
+        let anchor = self.canvas_frame(anchor);
+        let size = self.ideal_sizes(output).first()?.size;
+        let others: Vec<_> = self
+            .windows
+            .iter()
+            .filter(usable)
+            .map(|o| self.canvas_frame(o))
+            .collect();
+        let gap = (self.config.appearance.gaps as f64).max(MIN_SIBLING_GAP);
+        let loc = next_in_order(anchor, size, &others, gap, self.numbering());
+        Some(Rectangle::new(loc, size))
+    }
+
+    /// Moves the camera of `ws` (at its zoom) so `rect` is in the middle.
+    fn center_on_rect(&mut self, output: &Output, ws: usize, rect: Rectangle<f64, Logical>) {
+        let area = self.usable_area(output).to_f64();
+        let zoom = self.workspace(ws).target().zoom;
+        let cam = Camera::centered_on(rect, area, zoom);
+        let dur = self.camera_duration();
+        self.workspace_mut(ws).animate_to(cam, dur, Instant::now());
+        self.queue_redraw(output);
     }
 
     /// A window that is gone or got its place from a rule needs no pick.
@@ -527,6 +675,30 @@ mod tests {
         let all = [rect(-1000.0, -1000.0, 3000.0, 3000.0)];
         let p = beside(sib, (50.0, 50.0).into(), &all, 10.0);
         assert_eq!(p, Point::from((110.0, 0.0)));
+    }
+
+    #[test]
+    fn rows_open_to_the_right_past_windows_in_the_way() {
+        let anchor = rect(0.0, 0.0, 1000.0, 600.0);
+        let taken = rect(1020.0, 100.0, 500.0, 300.0);
+        let p = next_in_order(
+            anchor,
+            (1000.0, 600.0).into(),
+            &[anchor, taken],
+            20.0,
+            Numbering::Rows,
+        );
+        assert_eq!(p, Point::from((1540.0, 0.0)));
+    }
+
+    #[test]
+    fn columns_open_below_and_rtl_to_the_left() {
+        let anchor = rect(0.0, 0.0, 1000.0, 600.0);
+        let size: Size<f64, Logical> = (800.0, 500.0).into();
+        let below = next_in_order(anchor, size, &[anchor], 20.0, Numbering::Columns);
+        assert_eq!(below, Point::from((0.0, 620.0)));
+        let left = next_in_order(anchor, size, &[anchor], 20.0, Numbering::RowsRtl);
+        assert_eq!(left, Point::from((-820.0, 0.0)));
     }
 
     #[test]

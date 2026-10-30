@@ -219,6 +219,7 @@ impl State {
     pub fn notify_activity(&mut self) {
         let seat = self.seat.clone();
         self.idle_notifier_state.notify_activity(&seat);
+        self.idle_activity();
     }
 
     fn super_held(&self) -> bool {

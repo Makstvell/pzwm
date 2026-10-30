@@ -593,21 +593,24 @@ impl State {
         let from_profile = self.place_from_profile(idx);
         let ruled = !from_profile && self.apply_rules(idx);
         // Dialogs and an app's further windows open by their parent or
-        // sibling; everything else asks for its place in "pick" mode.
-        let pick = !ruled
+        // sibling; everything else asks for its place in "pick" mode, or
+        // goes beside the focused window in "beside" mode.
+        let placed_by_mode = !ruled
             && !from_profile
             && area.is_none()
             && parent_frame.is_none()
             && sibling.is_none()
-            && self.config.canvas.new_window_placement == "pick"
             && !self.windows[idx].scratchpad
             && !self.is_dialog_like(idx);
+        let mode = self.config.canvas.new_window_placement.as_str();
         if !ruled {
             if !from_profile {
                 self.windows[idx].late_rules = Some(Instant::now() + LATE_RULES);
             }
-            if pick {
+            if placed_by_mode && mode == "pick" {
                 self.wait_for_pick(idx);
+            } else if placed_by_mode && mode == "beside" {
+                self.place_beside(idx);
             } else {
                 let window = self.windows[idx].window.clone();
                 self.focus_window(Some(window));

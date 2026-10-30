@@ -63,6 +63,10 @@ pub enum Action {
     /// `area [spawn CMD] | cancel | rect X,Y WxH`: where the next window
     /// opens, see area.rs.
     Area(String),
+    /// Screens on, off or toggled.
+    Dpms(String),
+    /// Start the lock screen.
+    Lock,
     /// `tile [left|right|up|down|grow DIR|apply|cancel]`: put the focused
     /// window on cells of a grid over the screen, see tile.rs.
     Tile(String),
@@ -135,6 +139,8 @@ impl Action {
             "find" | "search" => Self::Find,
             "draw" => Self::Draw(arg.to_string()),
             "area" => Self::Area(arg.to_string()),
+            "dpms" | "screens" => Self::Dpms(arg.to_string()),
+            "lock" | "lock-session" => Self::Lock,
             "tile" | "grid" => Self::Tile(arg.to_string()),
             "arrange" => Self::Arrange(crate::arrange::Arrangement::parse(arg)?),
             "present" | "presentation" => Self::Present(arg.to_string()),

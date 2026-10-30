@@ -702,6 +702,7 @@ impl SessionLockHandler for State {
         // the lock can be confirmed right away.
         confirmation.lock();
         self.lock = LockState::Locked;
+        self.idle_locked();
         self.interaction = None;
         self.refresh_keyboard_focus();
         self.queue_redraw_all();
@@ -711,6 +712,7 @@ impl SessionLockHandler for State {
         info!("session unlocked");
         self.lock = LockState::Unlocked;
         self.lock_surfaces.clear();
+        self.idle_unlocked();
         self.refresh_keyboard_focus();
         self.queue_redraw_all();
     }

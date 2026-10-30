@@ -81,9 +81,14 @@ start_zoom = 0.667
 # A new window of an app that already has one on the workspace (a second
 # Zoom or Telegram window) opens beside it; dialog-sized ones open over it.
 place_near_siblings = true
-# Where any other new window opens: "center" (the middle of the view) or
-# "pick" (it waits until you drag out its area and takes exactly that area;
-# Escape: the middle). Dialogs and an app's further windows never wait.
+# Where any other new window opens:
+#   "center"  the middle of the view;
+#   "pick"    it waits until you drag out its area and takes exactly that
+#             area (Enter: beside the focused window, Escape: the middle);
+#   "beside"  at the ideal size next to the focused window, in the order of
+#             [general] window_numbers: right for rows, below for columns,
+#             left for rows-rtl.
+# Dialogs and an app's further windows never wait.
 new_window_placement = "center"
 # Cells of the Super+T grid, "COLSxROWS" (up to 12x12): 6x4 makes halves,
 # thirds, quarters and sixths.
@@ -191,6 +196,30 @@ inactive_border = "#353b48"
 titlebar_color = "#14161d"
 titlebar_active_color = "#1b1e29"
 pinned_accent = "#f59e0b"
+# Dark or light apps: "dark", "light", or "system" to leave it alone. Sets
+# the GTK color scheme (GTK 4, libadwaita, browsers, Electron), switches
+# Adwaita and Adwaita-dark for GTK 3 and the DankMaterialShell bar.
+color_scheme = "system"
+# QT_QPA_PLATFORMTHEME for Qt apps, so they follow it too: "auto" uses
+# qt6ct when installed (set its colors in qt6ct), "" leaves it alone.
+# Read at login; an already set QT_QPA_PLATFORMTHEME wins.
+qt_platform_theme = "auto"
+
+# When nothing happens (seconds without input; 0 turns a step off). Any
+# input wakes the screens and undoes the dimming; a playing video (an app
+# inhibiting idle) holds everything back. Replaces hypridle or swayidle.
+[idle]
+enabled = true
+dim_after = 480                       # 8 min
+dim_command = "brightnessctl -s set 10%"
+undim_command = "brightnessctl -r"
+screen_off_after = 660                # 11 min
+lock_after = 900                      # 15 min
+lock_command = "auto"                 # the DMS lock, else hyprlock, else swaylock
+suspend_after = 1800                  # 30 min
+suspend_on_ac = false                 # sleep only on battery
+lock_before_sleep = true              # also for the lid and the power menu
+locked_screen_off_after = 60          # once locked, screens off after 1 min
 
 # Per-monitor settings. Output names are printed in the log at startup.
 # [[output]]
@@ -357,7 +386,8 @@ pinned_accent = "#f59e0b"
 # Draw on the canvas; show or hide the drawings.
 "Super+Shift+D" = "draw"
 "Super+Alt+D" = "draw hide"
-# Pick an area with the mouse: the next window opens there (Esc cancels).
+# Pick an area with the mouse: the next window opens there (Enter: beside
+# the focused window at the ideal size, Esc cancels).
 "Super+O" = "area"
 # Put the window on cells of a grid: drag across them, or arrows,
 # Shift+arrows and Enter.
@@ -367,6 +397,9 @@ pinned_accent = "#f59e0b"
 "Super+F5" = "present"
 "Super+Next" = "present next"
 "Super+Prior" = "present prev"
+# Lock the screen; turn the screens off.
+"Super+L" = "lock"
+"Super+Shift+Escape" = "dpms off"
 # Desktop profiles window.
 "Super+Shift+P" = "spawn pzwm-config --page profiles"
 

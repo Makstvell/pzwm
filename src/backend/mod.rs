@@ -146,6 +146,13 @@ pub fn set_gamma(state: &State, output: &Output, ramp: Option<&[u16]>) -> Result
     }
 }
 
+/// Turns every screen off (DPMS) or back on.
+pub fn set_screens_power(state: &mut State, on: bool) {
+    if matches!(state.backend, Backend::Udev(_)) {
+        udev::set_screens_power(state, on);
+    }
+}
+
 pub fn reconfigure_input(state: &mut State) {
     let input = state.config.input.clone();
     if let Backend::Udev(data) = &mut state.backend {

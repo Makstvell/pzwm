@@ -199,6 +199,10 @@ pub struct State {
     pub lock: LockState,
     pub lock_surfaces: HashMap<String, LockSurface>,
     pub idle_inhibitors: Vec<WlSurface>,
+    /// Dimming, screens off, lock and sleep when idle (idle.rs).
+    pub idle: crate::idle::IdleState,
+    /// The color scheme last applied (theme.rs).
+    pub applied_scheme: Option<crate::theme::Scheme>,
     pub render_cache: RenderCache,
     /// Off while rendering a screenshot that asked not to include the cursor.
     pub render_cursor: bool,
@@ -407,6 +411,8 @@ impl State {
             lock: LockState::default(),
             lock_surfaces: HashMap::new(),
             idle_inhibitors: Vec::new(),
+            idle: Default::default(),
+            applied_scheme: None,
             render_cache: RenderCache::default(),
             render_cursor: true,
             pending_copies: Vec::new(),

@@ -57,16 +57,17 @@ line some up on a grid over the screen when you want to (`Super+T`).
 | **Status** | Personal project, version 0.1, used daily |
 | **License** | Apache-2.0 |
 
-### Two ways to open windows
+### Three ways to open windows
 
 | Mode | What happens when a window opens | Set it |
 |---|---|---|
 | **center** (default) | it appears at once in the middle of the view, 90 % × 90 % of the screen | `new_window_placement = "center"` |
-| **pick** | it waits until you drag out its area with the mouse, then takes exactly that place and size (Escape: the middle) | `new_window_placement = "pick"` |
+| **pick** | it waits until you drag out its area with the mouse, then takes exactly that place and size. **Enter** instead puts it beside the focused window at the ideal size; Escape: the middle | `new_window_placement = "pick"` |
+| **beside** | it opens at once at the ideal size next to the focused window, the next place in the order of window numbers: to the right for rows (`window_numbers = "rows"`), below for `columns`, to the left for `rows-rtl` | `new_window_placement = "beside"` |
 
 Switch in **pzwm config** → Canvas → *Where new windows open*, or in
 `~/.config/pzwm/config.toml` under `[canvas]`; it applies as soon as the
-file is saved. In either mode, `Super+O` (or `Super+Ctrl` + left drag)
+file is saved. In any mode, `Super+O` (or `Super+Ctrl` + left drag)
 picks the place of just the next window, and dialogs and an app's own
 further windows always open by the window they belong to. Details:
 [Where new windows open](#where-new-windows-open).
@@ -86,22 +87,27 @@ further windows always open by the window they belong to. Details:
 11. [Configuration file](#configuration-file)
 12. [Workspaces and the bar](#workspaces-and-the-bar)
 13. [Monitors](#monitors)
-14. [Desktop profiles](#desktop-profiles)
-15. [Groups, bookmarks and find](#groups-bookmarks-and-find)
-16. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
-17. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
-18. [Scripting: pzwm msg](#scripting-pzwm-msg)
-19. [Works with](#works-with)
-20. [Troubleshooting](#troubleshooting)
-21. [For developers](#for-developers)
-22. [Similar projects](#similar-projects)
-23. [Credits](#credits)
-24. [License](#license)
+14. [Idle, lock and sleep](#idle-lock-and-sleep)
+15. [Dark mode](#dark-mode)
+16. [Desktop profiles](#desktop-profiles)
+17. [Groups, bookmarks and find](#groups-bookmarks-and-find)
+18. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
+19. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
+20. [Scripting: pzwm msg](#scripting-pzwm-msg)
+21. [Works with](#works-with)
+22. [Troubleshooting](#troubleshooting)
+23. [For developers](#for-developers)
+24. [Similar projects](#similar-projects)
+25. [Credits](#credits)
+26. [License](#license)
 
 ## What's new
 
 | Feature | Keys / option | More |
 |---|---|---|
+| Open a window beside the focused one at the ideal size, in the order of window numbers: always, or with Enter instead of dragging an area | `[canvas] new_window_placement = "beside"`; Enter while picking | [Where new windows open](#where-new-windows-open) |
+| Idle and sleep built in: dim, screens off, lock, sleep on battery only, lock before any sleep (lid, power menu); a playing video holds it back. Replaces hypridle | `[idle]`; `Super+L` lock, `Super+Shift+Escape` screens off | [Idle, lock and sleep](#idle-lock-and-sleep) |
+| Dark mode for apps: GTK 3 and 4, libadwaita, browsers, Electron, and Qt through qt6ct | `[appearance] color_scheme = "dark"` | [Dark mode](#dark-mode) |
 | Pick where a new window opens: drag out its area and it takes exactly that area | `Super+O`, `Super+Ctrl` + left drag, `Super+Shift+Return`; every window: `[canvas] new_window_placement = "pick"` | [Where new windows open](#where-new-windows-open) |
 | Windows an app opens by itself (Zoom's meeting window, dialogs) open by the one they came from, and the camera fits them; windows you launch are never put there | `[canvas] place_near_siblings` | [Where new windows open](#where-new-windows-open) |
 | Ideal size: the display's resolution at 100 % (a bar left out if there is one) or your own `ideal_sizes`; again: back | `Super+Shift+F` (fullscreen moved to `Super+Ctrl+F`) | [Shortcuts](#windows) |
@@ -179,6 +185,11 @@ further windows always open by the window they belong to. Details:
 
 **Desktop**
 - 10 workspaces, shown and switched in the DankMaterialShell bar.
+- **Idle and sleep** (`[idle]`): the screen dims, turns off, the session
+  locks and, on battery, the laptop sleeps; it locks before any sleep,
+  lid included. No hypridle or swayidle needed.
+- **Dark mode** for apps (`[appearance] color_scheme = "dark"`): GTK,
+  libadwaita, browsers, Electron, and Qt apps through qt6ct.
 - Desktop profiles: save where your apps are, restore them later; apps
   that are not running are started and put back in place. The
   **Desktop Profiles** window (`Super+Shift+P`) manages them, and the
@@ -215,6 +226,8 @@ further windows always open by the window they belong to. Details:
 | xdg-desktop-portal-wlr | screen sharing | `xdg-desktop-portal-wlr` (optional) |
 | xwayland-satellite | X11 apps | `xwayland-satellite` (optional) |
 | grim, slurp, wl-clipboard | screenshot shortcuts | `grim slurp wl-clipboard` (optional) |
+| brightnessctl | dimming when idle | `brightnessctl` (optional) |
+| qt6ct | dark mode in Qt apps | `qt6ct` (optional) |
 
 `./install.sh --deps` installs the required packages on Arch, Fedora,
 Debian/Ubuntu, openSUSE and Void.
@@ -281,8 +294,9 @@ Options: `--prefix DIR`, `--no-build` (install an existing build),
 
 | Window | Opens |
 |---|---|
-| after you picked an area | filling the area: `Super+O`, then drag a rectangle (Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
-| any other window, with `new_window_placement = "pick"` | nowhere yet: it waits until you drag out its area (the cursor is a crosshair) and then takes exactly that area, size included; a click without dragging keeps it waiting; Escape puts it in the middle of the view. Several new windows wait in turn |
+| after you picked an area | filling the area: `Super+O`, then drag a rectangle (Enter: beside the focused window instead, Esc cancels); or `Super+Ctrl` + left drag straight away; `Super+Shift+Return` picks an area and starts a terminal in it |
+| any other window, with `new_window_placement = "pick"` | nowhere yet: it waits until you drag out its area (the cursor is a crosshair) and then takes exactly that area, size included; a click without dragging keeps it waiting; **Enter** puts it beside the focused window at the ideal size (as in `"beside"`); Escape puts it in the middle of the view. Several new windows wait in turn |
+| any other window, with `new_window_placement = "beside"` | at once, at the [ideal size](#size-hints), next to the focused window: the next place in the order of [window numbers](#window-numbers), so to the right for `rows` and `opened`, below for `columns`, to the left for `rows-rtl`, stepping past windows in the way. The camera moves to it at the zoom you have. With nothing focused: the middle of the view |
 | a dialog (it has a parent window) | centered over its parent; the camera fits it, at most at 100 % |
 | a further window an app opens by itself (the same process as a window on the workspace, and you launched nothing just before) | beside that window (right, else below, left, above: the first free side), and the camera fits it, at most at 100 %; a window at most 60 % of the other one's size opens over it, like a dialog. A window you launch (a bind, the launcher, `pzwm msg spawn`, within 20 s) or a new process of the same app is yours and opens like any new window |
 | anything else (`new_window_placement = "center"`, the default) | in the middle of the view, 90 % × 90 % of the screen |
@@ -474,6 +488,8 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | `Super+Shift+Space` | next keyboard layout |
 | volume, mute, brightness, media keys | wpctl, brightnessctl, playerctl |
 | `Super+Shift+P` | **Desktop Profiles** window |
+| `Super+L` | lock the screen |
+| `Super+Shift+Escape` | turn the screens off (any input turns them on) |
 | `Super+Shift+R` | reload the config |
 | `Super+Ctrl+Q` | quit pzwm |
 
@@ -722,6 +738,52 @@ is saved (mode, scale, position, mirroring, `disable = true` to turn a
 monitor off). Tools such as kanshi or wdisplays change monitors live too;
 their changes last until the next config reload.
 
+## Idle, lock and sleep
+
+pzwm does what hypridle or swayidle did, so they are not needed (remove
+them from `autostart`). Times are seconds without input; 0 turns a step
+off.
+
+```toml
+[idle]
+enabled = true
+dim_after = 480               # dim the screen (dim_command, undim_command)
+screen_off_after = 660        # screens off
+lock_after = 900              # lock the session
+suspend_after = 1800          # sleep ...
+suspend_on_ac = false         # ... only on battery
+lock_before_sleep = true      # lock before any sleep: idle, lid, power menu
+locked_screen_off_after = 60  # once locked, screens off after a minute
+lock_command = "auto"         # the DMS lock, else hyprlock, else swaylock
+```
+
+- Any key, mouse move or touch undoes the dimming and wakes the screens.
+- While an app holds idle back (a video playing in a browser or mpv),
+  nothing happens.
+- Lock before sleep works for every sleep, also closing the lid or the
+  power menu: pzwm holds a short logind delay and starts the lock screen
+  before the laptop sleeps. `loginctl lock-session` locks too.
+- `Super+L` locks now (`lock` action), `Super+Shift+Escape` turns the
+  screens off (`dpms off`); both work from scripts: `pzwm msg lock`,
+  `pzwm msg dpms off`.
+- Settings app: **pzwm config** → *Idle and sleep*.
+
+## Dark mode
+
+```toml
+[appearance]
+color_scheme = "dark"       # "dark", "light", or "system" (leave it alone)
+qt_platform_theme = "auto"  # QT_QPA_PLATFORMTHEME: qt6ct when installed
+```
+
+`color_scheme` sets the GTK color scheme (GTK 4, libadwaita, Firefox,
+Chrome, Electron follow it), switches Adwaita to Adwaita-dark for GTK 3
+apps (a custom GTK theme is left alone) and puts the DankMaterialShell bar
+in the same mode. It applies at once, also on config reload. Qt apps
+follow a platform theme: with qt6ct installed pzwm exports
+`QT_QPA_PLATFORMTHEME=qt6ct` at login; choose a dark color scheme in
+**qt6ct** once.
+
 ## Desktop profiles
 
 A profile is a saved arrangement of your apps.
@@ -868,6 +930,8 @@ the reply. Any [action](#configuration-file) works as a request.
 | `pzwm msg draw …`, `present …`, `arrange …` | see [Drawing, presentation, arrange](#drawing-presentation-arrange-semantic-zoom); errors are printed, not only notified |
 | `pzwm msg bookmark list`, `group list` | bookmarks and groups with their workspace |
 | `pzwm msg heads --json` | every connected monitor (also disabled ones) with the modes it offers |
+| `pzwm msg dpms off\|on\|toggle`, `pzwm msg lock` | screens off or on, lock the session (for scripts and other idle daemons) |
+| `pzwm msg area beside` | while an area is being picked: beside the focused window, like Enter |
 | `pzwm reload` | re-read the config |
 | `pzwm --check-config [FILE]` | check the config (or another file) for errors |
 | `pzwm --print-default-config` | print the documented defaults |
@@ -894,6 +958,7 @@ pzwm msg subscribe | jq -r 'select(.event=="focus-changed") | .id'
 | `PZWM_SOCKET` | `$XDG_RUNTIME_DIR/pzwm-<display>.sock`, used by `pzwm msg` |
 | `UMBRIEL_SOCKET` | `$XDG_RUNTIME_DIR/pzwm-bar-<display>.sock`, the bar feed |
 | `DISPLAY` | the X11 display of xwayland-satellite, when it runs |
+| `QT_QPA_PLATFORMTHEME` | `qt6ct` when installed and not set already (`[appearance] qt_platform_theme`) |
 
 ## Works with
 
@@ -907,7 +972,7 @@ other programs:
 | Launcher | rofi, fuzzel |
 | Notifications | mako, swaync |
 | Wallpaper | swaybg, awww |
-| Lock and idle | hyprlock, hypridle, swayidle |
+| Lock screen | the DMS lock, hyprlock, swaylock (idle itself is built in: [Idle, lock and sleep](#idle-lock-and-sleep); hypridle and swayidle also work) |
 | Taskbar, dock | waybar `wlr/taskbar`, DankMaterialShell dock |
 | Monitor setup | kanshi, wdisplays, wlr-randr, nwg-displays |
 | Night light | wlsunset, gammastep |
@@ -940,6 +1005,9 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | A second window of a running app asks for its place | It was launched by you (a bind, the launcher, `pzwm msg spawn`) or is a new process: those always open like a new window. Only windows the app opens by itself go beside their sibling |
 | Tiled windows end up different sizes | Use `[canvas] tile_mode = "zoom"` (the default): tiling goes to 100 % first. With `"canvas"` the size depends on the zoom you tile at |
 | Window numbers are not in the order I expect | Set `[general] window_numbers` to `rows`, `rows-rtl`, `columns` or `opened` |
+| Apps open in light mode | Set `[appearance] color_scheme = "dark"`. Qt apps (Dolphin, KDE apps) also need a platform theme: install `qt6ct`, pick a dark color scheme in it and log in again (pzwm sets `QT_QPA_PLATFORMTHEME=qt6ct`). In Chrome choose Settings → Appearance → Mode: Device |
+| The screen dims or locks twice, or `hyprctl` errors in the log | hypridle (or swayidle) still runs from `autostart`: remove it, pzwm's `[idle]` does the same |
+| The laptop does not lock before sleep | It needs `gdbus` (glib2) and `systemd-inhibit`; `journalctl --user -t pzwm -b \| grep -i sleep` shows what happened |
 | Config changes are ignored | `pzwm --check-config` shows the error; pzwm keeps the old settings until it is fixed |
 | No bar after login | `systemctl --user add-wants pzwm-session.target dms.service`, then log in again |
 | Bar shows no workspaces | Check that `umbriel` is installed (`which umbriel`) and that DMS was started by pzwm |
@@ -977,8 +1045,10 @@ xdg-foreign, alpha-modifier, content-type and xdg-system-bell.
 | `src/toplevels.rs` | window lists for taskbars (foreign-toplevel) |
 | `src/output_management.rs`, `src/gamma.rs` | monitor tools and night light |
 | `src/rules.rs`, `src/scratchpad.rs` | window rules, drop-down window |
-| `src/area.rs` | picked area for the next window, pick mode, placing an app's windows side by side |
+| `src/area.rs` | picked area for the next window, pick mode, beside mode, placing an app's windows side by side |
 | `src/tile.rs` | tile grid, snap ½ → ⅓ → ⅔, corner quarters |
+| `src/idle.rs` | idle: dim, screens off, lock, sleep; lock before sleep through logind |
+| `src/theme.rs` | dark or light apps, Qt platform theme |
 | `src/draw.rs`, `src/render/drawings.rs` | drawing on the canvas: strokes, eraser, saving, rendering |
 | `src/present.rs`, `src/arrange.rs` | presentation through bookmarks, one-shot layouts |
 | `src/icons.rs`, `src/render/semantic.rs` | app icon lookup, semantic-zoom cards |

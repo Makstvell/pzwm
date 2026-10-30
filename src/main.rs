@@ -20,6 +20,7 @@ mod grabs;
 mod groups;
 mod handlers;
 mod icons;
+mod idle;
 mod image_copy;
 mod input;
 mod ipc;
@@ -39,6 +40,7 @@ mod shell;
 mod sizehint;
 mod state;
 mod tablet;
+mod theme;
 mod tile;
 mod toplevels;
 
@@ -216,6 +218,14 @@ fn run(nested: bool) -> anyhow::Result<()> {
         std::env::set_var("XCURSOR_THEME", &state.config.general.cursor_theme);
         std::env::set_var("XCURSOR_SIZE", state.config.general.cursor_size.to_string());
         std::env::remove_var("DISPLAY");
+        // Qt apps follow the dark or light scheme only through a platform theme.
+        let current = std::env::var("QT_QPA_PLATFORMTHEME").ok();
+        if let Some(theme) = theme::qt_platform_theme(
+            &state.config.appearance.qt_platform_theme,
+            current.as_deref(),
+        ) {
+            std::env::set_var("QT_QPA_PLATFORMTHEME", theme);
+        }
     }
 
     if state.config.general.xwayland {
@@ -223,6 +233,10 @@ fn run(nested: bool) -> anyhow::Result<()> {
     }
     start_parallax_tick(&mut state);
     start_autosave(&mut state);
+    state.apply_color_scheme();
+    if !nested {
+        state.start_idle();
+    }
     let real_session = !nested && state.config.general.systemd_session;
     if real_session {
         start_systemd_session(&state);
@@ -350,6 +364,9 @@ fn start_systemd_session(state: &State) {
     ];
     if state.xwayland_display.is_some() {
         vars.push("DISPLAY");
+    }
+    if std::env::var_os("QT_QPA_PLATFORMTHEME").is_some() {
+        vars.push("QT_QPA_PLATFORMTHEME");
     }
     let ok = |cmd: &mut Command| {
         cmd.stdin(Stdio::null())
