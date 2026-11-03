@@ -210,6 +210,11 @@ pub struct State {
     pub split_press: Option<crate::split::LastPress>,
     /// Where the window being dragged would drop into a split.
     pub split_drop: Option<crate::split::DropTarget>,
+    /// Filling the empty places of a split (split_assist.rs).
+    pub assist: Option<crate::split_assist::Assist>,
+    /// A press pzwm used up (a click that picked a window): neither it nor
+    /// its release reach the app.
+    pub swallowed_button: Option<u32>,
     /// Dimming, screens off, lock and sleep when idle (idle.rs).
     pub idle: crate::idle::IdleState,
     /// The color scheme last applied (theme.rs).
@@ -428,6 +433,8 @@ impl State {
             next_split_id: 1,
             split_press: None,
             split_drop: None,
+            assist: None,
+            swallowed_button: None,
             idle: Default::default(),
             applied_scheme: None,
             render_cache: RenderCache::default(),

@@ -232,6 +232,7 @@ KEY_ACTIONS = (
     "home",
     "navigate",
     "split",
+    "unsplit",
     "pan left",
     "zoom-in",
     "zoom-out",

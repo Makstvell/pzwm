@@ -391,7 +391,8 @@ back, and they are still together.
 
 | Do | How |
 |---|---|
-| Make one | `Super+S`: the focused window fills the view and becomes a split (with `tile_mode = "zoom"`, at 100 % first) |
+| Make one | `Super+S` on a window: it takes the left place of a layout over the view, the other places show empty with a "+", and the camera steps back so you see the rest of your windows |
+| Fill the empty places | click a window (on the canvas or on the minimap), type its number, drag it onto a place, or open a new app: each goes into the next empty place (the brighter one). `Super+S` or `Tab` again: the next layout (½ ½, ⅔ ⅓, ½ ¼¼, ⅓ ⅓ ⅓, quarters); `Enter` or `Esc`: done, the camera comes back to the split. It is done by itself once every place is taken |
 | Add a window | while a new window waits for its place, an arrow or `h j k l` puts it into the focused window's split on that side: `←` / `→` a new column, `↑` / `↓` a new row in that column; the others shrink to make room |
 | Snap two together | `Super+[` / `Super+]`, a drop on a screen edge or corner, or the tile grid: a window that lines up with a neighbour (same top and height side by side, or same left and width stacked) joins it into a split |
 | Resize two at once | drag the gap between them, or the edge they share; double-click it to share evenly |
@@ -402,7 +403,8 @@ back, and they are still together.
 | Drag a window in | drag any window by its title over a window of the split: the half it would take lights up; drop it there |
 | Rearrange | drag a member over another one the same way, or `Super+Ctrl` + arrows: it swaps places with its neighbour on that side |
 | Maximize for a while | maximize, fullscreen or ideal size (`Super+Shift+F`) on a member: its place stays free, and it goes back there when restored |
-| Take a window out | `Super+S` on it, drag it away by its title and drop it outside, pin or close it; the others take its space |
+| Add more later | `Super+S` on a member: the split gets an empty place again |
+| Take a window out | `Super+Ctrl+S` on it, drag it away by its title and drop it outside, pin or close it; the others take its space |
 
 ## Putting windows on the screen: tile grid, halves, corners
 
@@ -455,7 +457,7 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | `Super+BackSpace` | zoom to 100 % |
 | `Super+Home` | go back to the start of the canvas, at `[canvas] start_zoom` |
 | `Super+Alt` + arrows or `h j k l` | move the canvas, smoothly for as long as you hold the key (`Shift`: faster; `[canvas] pan_speed`) |
-| `Super+S` | split: the focused window becomes one (again: takes it out), see [Splits](#splits-windows-tiled-together) |
+| `Super+S` | split: the focused window takes a place of a layout, click windows to fill the others (`Tab`: layout, `Enter`: done); `Super+Ctrl+S`: out of the split. See [Splits](#splits-windows-tiled-together) |
 | `Super+N` | navigate mode: plain arrows or `h j k l` move the canvas, `+` / `-` zoom, `0` home, `Esc` or `Enter` done |
 | `Super+C` | fit the focused window: center it and zoom to fill the screen |
 | `Super+Tab` or `Super+Z` | overview of all windows; again to go back |

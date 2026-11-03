@@ -609,12 +609,14 @@ impl State {
             && sibling.is_none()
             && !self.windows[idx].scratchpad
             && !self.is_dialog_like(idx);
-        let mode = self.config.canvas.new_window_placement.as_str();
+        let mode = self.config.canvas.new_window_placement.clone();
         if !ruled {
             if !from_profile {
                 self.windows[idx].late_rules = Some(Instant::now() + LATE_RULES);
             }
-            if placed_by_mode && mode == "pick" {
+            if placed_by_mode && self.assist_takes_new(idx) {
+                // It took an empty place of the split being filled.
+            } else if placed_by_mode && mode == "pick" {
                 self.wait_for_pick(idx);
             } else if placed_by_mode && mode == "beside" {
                 self.place_beside(idx);

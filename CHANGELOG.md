@@ -6,6 +6,19 @@ landed on `main`. pzwm has no tagged release yet, so everything is under
 
 ## Unreleased
 
+### 2026-11-03: split assist
+
+**Changed**
+- `Super+S` is now a split assist, like Snap Layouts in Windows: the
+  focused window takes the left place of a layout over the view, the other
+  places show empty with a "+", and the camera steps back so the rest of
+  your windows are in sight. Click a window (on the canvas or the
+  minimap), type its number, drag it onto a place or open a new app: each
+  goes into the next empty place. `Super+S` or `Tab` again cycles the
+  layouts (½ ½, ⅔ ⅓, ½ ¼¼, ⅓ ⅓ ⅓, quarters); `Enter` or `Esc` is done and
+  the camera comes back. `Super+S` on a member adds an empty place again;
+  `Super+Ctrl+S` (`unsplit`) takes a window out.
+
 ### 2026-11-03: splits
 
 **Added**

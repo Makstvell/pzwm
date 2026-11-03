@@ -95,6 +95,7 @@ pub(super) fn split_elements<R: PzRenderer>(
         .retain(|(o, id), _| *o != name || outlines.iter().any(|(s, _, _)| s == id));
     let cam = state.camera(output);
     let screen = Rectangle::from_size(state.output_geometry(output).size.to_f64());
+    place_elements(state, output, os, sh, out);
     let [r, g, b, _] = state.config.appearance.active_border_start;
     let radius = state.config.appearance.corner_radius as f64 * cam.zoom + SPLIT_PAD;
     for (id, area, focused) in outlines {
@@ -122,6 +123,79 @@ pub(super) fn split_elements<R: PzRenderer>(
             .render_cache
             .splits
             .entry((name.clone(), id))
+            .or_default();
+        out.push(PzElement::Shader(
+            elem.update(&sh.rect, phys_rect(rect, os), 1.0, &uniforms)
+                .clone(),
+        ));
+    }
+}
+
+/// Length and thickness of the "+" in an empty place, screen pixels.
+const PLUS_LEN: f64 = 44.0;
+const PLUS_THICK: f64 = 6.0;
+
+/// Empty places of a split being filled: a tinted outlined area with a
+/// "+", the next one to be filled brighter.
+fn place_elements<R: PzRenderer>(
+    state: &mut State,
+    output: &Output,
+    os: f64,
+    sh: &Shaders,
+    out: &mut Vec<PzElement<R>>,
+) {
+    let ws = state.output_ws(output);
+    let places = state.split_empty_places(ws);
+    let name = output.name();
+    state.render_cache.places.retain(|(o, s, i, _), _| {
+        *o != name || places.iter().any(|(ps, pi, _, _)| ps == s && pi == i)
+    });
+    let cam = state.camera(output);
+    let [r, g, b, _] = state.config.appearance.active_border_end;
+    let radius = state.config.appearance.corner_radius as f64 * cam.zoom;
+    for (split, i, area, next) in places {
+        let rect: Rectangle<f64, Logical> =
+            Rectangle::new(cam.to_screen(area.loc), area.size.upscale(cam.zoom));
+        let (fill, stroke) = if next { (0.20, 1.0) } else { (0.09, 0.6) };
+        let c = rect.loc + rect.size.downscale(2.0).to_point();
+        let bars = [
+            Rectangle::new(
+                (c.x - PLUS_LEN / 2.0, c.y - PLUS_THICK / 2.0).into(),
+                (PLUS_LEN, PLUS_THICK).into(),
+            ),
+            Rectangle::new(
+                (c.x - PLUS_THICK / 2.0, c.y - PLUS_LEN / 2.0).into(),
+                (PLUS_THICK, PLUS_LEN).into(),
+            ),
+        ];
+        // Front to back: the "+", then the place.
+        for (part, bar) in bars.into_iter().enumerate() {
+            let uniforms = [
+                ("u_fill", ShaderValue::F4([r, g, b, stroke])),
+                ("u_stroke", ShaderValue::F4([r, g, b, stroke])),
+                ("u_radius", ShaderValue::F1((PLUS_THICK / 2.0 * os) as f32)),
+                ("u_border", ShaderValue::F1(0.0)),
+            ];
+            let elem = state
+                .render_cache
+                .places
+                .entry((name.clone(), split, i, 1 + part as u8))
+                .or_default();
+            out.push(PzElement::Shader(
+                elem.update(&sh.rect, phys_rect(bar, os), 1.0, &uniforms)
+                    .clone(),
+            ));
+        }
+        let uniforms = [
+            ("u_fill", ShaderValue::F4([r, g, b, fill])),
+            ("u_stroke", ShaderValue::F4([r, g, b, stroke])),
+            ("u_radius", ShaderValue::F1((radius * os) as f32)),
+            ("u_border", ShaderValue::F1((2.0 * os) as f32)),
+        ];
+        let elem = state
+            .render_cache
+            .places
+            .entry((name.clone(), split, i, 0))
             .or_default();
         out.push(PzElement::Shader(
             elem.update(&sh.rect, phys_rect(rect, os), 1.0, &uniforms)

@@ -40,6 +40,7 @@ mod screencopy;
 mod shell;
 mod sizehint;
 mod split;
+mod split_assist;
 mod state;
 mod tablet;
 mod theme;

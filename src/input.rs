@@ -574,6 +574,13 @@ impl State {
 
         if button_state == ButtonState::Pressed && free {
             self.press(button, serial);
+            if self.swallowed_button == Some(button) {
+                return;
+            }
+        }
+        if button_state == ButtonState::Released && self.swallowed_button == Some(button) {
+            self.swallowed_button = None;
+            return;
         }
         pointer.button(self, &event);
         pointer.frame(self);
@@ -617,6 +624,25 @@ impl State {
                 self.end_tile();
             }
             return;
+        }
+        // Split assist: a click on a window puts it into the next place.
+        if self.assist.is_some() && button == BTN_LEFT {
+            let window = match &under {
+                Under::Surface {
+                    window: Some(i), ..
+                } => Some(*i),
+                Under::Decoration { window, hit } if !matches!(hit, Hit::Button(_)) => {
+                    Some(*window)
+                }
+                _ => None,
+            };
+            if let Some(i) = window {
+                let id = self.windows[i].id;
+                if self.assist_pick(id) {
+                    self.swallowed_button = Some(button);
+                    return;
+                }
+            }
         }
         if self.area.selecting && over_canvas && button == BTN_LEFT {
             grabs::start_area(self, serial, button);
@@ -821,6 +847,11 @@ impl State {
         match hit {
             MapHit::Window(idx) => {
                 let id = self.windows[idx].id;
+                // Filling a split: the window clicked on the map goes in.
+                if self.assist.is_some() {
+                    self.assist_pick(id);
+                    return;
+                }
                 let w = self.windows[idx].window.clone();
                 self.focus_window(Some(w));
                 self.remember_camera(&output);

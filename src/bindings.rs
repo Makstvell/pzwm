@@ -103,6 +103,25 @@ impl State {
                         return FilterResult::Intercept(Some(action));
                     }
                 }
+                // Split assist: Enter / Escape done, Tab or space the next
+                // layout, a digit puts that window into the next place.
+                if state.assist.is_some() && !pressed.logo && !pressed.ctrl && !pressed.alt {
+                    let action = match sym {
+                        Keysym::Return | Keysym::KP_Enter | Keysym::Escape => {
+                            Some(Action::SplitDone)
+                        }
+                        Keysym::Tab | Keysym::space => Some(Action::Split),
+                        s if (Keysym::_1.raw()..=Keysym::_9.raw()).contains(&s.raw()) => {
+                            Some(Action::SplitPick((s.raw() - Keysym::_1.raw()) as usize))
+                        }
+                        Keysym::_0 => Some(Action::SplitPick(9)),
+                        _ => None,
+                    };
+                    if let Some(action) = action {
+                        state.suppressed_keys.push(keycode);
+                        return FilterResult::Intercept(Some(action));
+                    }
+                }
                 // `navigate`: plain arrows and h j k l move the view.
                 if state.keypan.mode && !pressed.logo && !pressed.ctrl && !pressed.alt {
                     if let Some(key) = crate::keypan::nav_key(sym) {
@@ -288,8 +307,16 @@ impl State {
             Action::Navigate => self.toggle_navigate(),
             Action::FocusNumber(forward) => self.focus_number_step(forward),
             Action::Split => {
-                let result = self.toggle_split();
+                let result = self.split_assist();
                 self.notify_result("split", result, false);
+            }
+            Action::SplitDone => self.assist_done(),
+            Action::SplitPick(n) => self.assist_pick_number(n),
+            Action::Unsplit => {
+                if let Some(i) = focused {
+                    let id = self.windows[i].id;
+                    self.leave_split(id);
+                }
             }
             Action::IdealSize => {
                 if let Some(i) = focused {

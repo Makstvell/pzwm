@@ -26,6 +26,10 @@ use smithay::{
 
 use crate::{action::Dir, shell::Placement, state::State};
 
+/// Id of an empty place in a split, waiting for a window (see
+/// split_assist.rs). Window ids start at 1.
+pub const EMPTY: u64 = 0;
+
 /// A column or row is never squeezed below this (canvas units).
 const MIN_SPAN: f64 = 160.0;
 /// How far from a gap's middle a press still grabs it (screen pixels).
@@ -109,8 +113,40 @@ impl Split {
         }
     }
 
+    /// The windows in it (empty places left out).
     pub fn members(&self) -> impl Iterator<Item = u64> + '_ {
-        self.cols.iter().flat_map(|c| c.rows.iter().map(|r| r.id))
+        self.cols
+            .iter()
+            .flat_map(|c| c.rows.iter().map(|r| r.id))
+            .filter(|&id| id != EMPTY)
+    }
+
+    /// Empty places, in layout order.
+    pub fn empty_places(&self) -> usize {
+        self.cols
+            .iter()
+            .flat_map(|c| &c.rows)
+            .filter(|r| r.id == EMPTY)
+            .count()
+    }
+
+    /// Puts `window` into the first empty place; false when there is none.
+    pub fn fill_place(&mut self, window: u64) -> bool {
+        match self.position(EMPTY) {
+            Some((c, r)) => {
+                self.cols[c].rows[r].id = window;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Drops the empty places, the others taking their space.
+    pub fn drop_empty_places(&mut self) {
+        for col in &mut self.cols {
+            col.rows.retain(|r| r.id != EMPTY);
+        }
+        self.cols.retain(|c| !c.rows.is_empty());
     }
 
     pub fn position(&self, id: u64) -> Option<(usize, usize)> {
@@ -284,11 +320,16 @@ impl Split {
         p: Point<f64, Logical>,
         gap: f64,
         skip: u64,
-    ) -> Option<(u64, Dir, Rectangle<f64, Logical>)> {
-        let (id, r) = self
-            .layout(gap)
-            .into_iter()
-            .find(|(m, r)| *m != skip && !self.is_away(*m) && r.contains(p))?;
+    ) -> Option<DropSpot> {
+        let layout = self.layout(gap);
+        let i = layout
+            .iter()
+            .position(|(m, r)| *m != skip && !self.is_away(*m) && r.contains(p))?;
+        let (id, r) = layout[i];
+        // An empty place is taken whole.
+        if id == EMPTY {
+            return Some((EMPTY, Dir::Right, r, self.cell_at(i)));
+        }
         let dx = (p.x - (r.loc.x + r.size.w / 2.0)) / r.size.w.max(1.0);
         let dy = (p.y - (r.loc.y + r.size.h / 2.0)) / r.size.h.max(1.0);
         let side = if dx.abs() >= dy.abs() {
@@ -306,11 +347,21 @@ impl Split {
             Dir::Up => Rectangle::new(r.loc, (r.size.w, hh).into()),
             Dir::Down => Rectangle::new((r.loc.x, r.loc.y + hh).into(), (r.size.w, hh).into()),
         };
-        Some((id, side, half))
+        Some((id, side, half, None))
     }
 
+    /// Column and row of the `i`-th cell in layout order.
+    pub fn cell_at(&self, i: usize) -> Option<(usize, usize)> {
+        self.cols
+            .iter()
+            .enumerate()
+            .flat_map(|(c, col)| (0..col.rows.len()).map(move |r| (c, r)))
+            .nth(i)
+    }
+
+    /// Windows in it (empty places do not count).
     pub fn len(&self) -> usize {
-        self.cols.iter().map(|c| c.rows.len()).sum()
+        self.members().count()
     }
 
     /// The handle at canvas point `p` (`slop`: how close counts), if any.
@@ -415,8 +466,13 @@ fn shift_pair(a: f64, b: f64, d: f64) -> Option<(f64, f64)> {
     (a + b >= 2.0 * MIN_SPAN).then_some((a + d, b - d))
 }
 
+/// Where a window dropped on a split goes: next to (member, side), the half
+/// of that member it takes, and the empty place when dropped on one.
+pub type DropSpot = (u64, Dir, Rectangle<f64, Logical>, Option<(usize, usize)>);
+
 /// Where a dragged window drops into a split: (split, member, side).
-pub type DropTarget = (u64, u64, Dir);
+/// (split, member, side, the empty place when dropped on one).
+pub type DropTarget = (u64, u64, Dir, Option<(usize, usize)>);
 
 /// A divider press, for telling a double click.
 #[derive(Clone, Copy, Debug)]
@@ -466,38 +522,6 @@ impl State {
             }
         }
         self.queue_redraw_all();
-    }
-
-    /// `split`: the focused window becomes a split filling the view, or,
-    /// when it is in one already, leaves it.
-    pub fn toggle_split(&mut self) -> Result<String, String> {
-        let idx = self.focused_index().ok_or("no window focused")?;
-        let id = self.windows[idx].id;
-        if self.split_index_of(id).is_some() {
-            self.leave_split(id);
-            return Ok("left the split".into());
-        }
-        if self.windows[idx].placement != Placement::Canvas {
-            self.restore(idx);
-        }
-        let output = self.output_of(idx).ok_or("no output")?;
-        if self.config.canvas.tile_mode == "zoom" {
-            self.camera_to_full_scale(&output);
-        }
-        let ws = self.output_ws(&output);
-        let gap = self.split_gap();
-        let area = self.usable_area(&output).to_f64();
-        let screen = Rectangle::new(
-            (area.loc.x + gap, area.loc.y + gap).into(),
-            (area.size.w - 2.0 * gap, area.size.h - 2.0 * gap).into(),
-        );
-        let rect = self.workspace(ws).target().visible(screen);
-        let split = Split::new(self.next_split_id, ws, rect, id);
-        self.next_split_id += 1;
-        self.splits.push(split);
-        let si = self.splits.len() - 1;
-        self.relayout_split(si);
-        Ok("split: new windows join it with an arrow while you pick their place".into())
     }
 
     /// Takes `window` out of its split; the others take its space, and a
@@ -766,15 +790,33 @@ impl State {
         let p = cam.to_canvas(self.cursor_local(output));
         let gap = self.config.appearance.gaps as f64;
         self.splits.iter().filter(|s| s.ws == ws).find_map(|s| {
-            let (member, side, half) = s.drop_target(p, gap, dragged)?;
+            let (member, side, half, place) = s.drop_target(p, gap, dragged)?;
             let screen = Rectangle::new(cam.to_screen(half.loc), half.size.upscale(cam.zoom));
-            Some(((s.id, member, side), screen))
+            Some(((s.id, member, side, place), screen))
         })
     }
 
     /// The dragged window was dropped on a split: it joins it there.
     pub fn split_drop(&mut self, window: u64, target: DropTarget) {
-        let (_, member, side) = target;
+        let (split, member, side, place) = target;
+        // Onto an empty place: it takes exactly that place.
+        if let Some((c, r)) = place {
+            self.leave_split(window);
+            if let Some(si) = self.splits.iter().position(|s| s.id == split) {
+                if let Some(cell) = self.splits[si]
+                    .cols
+                    .get_mut(c)
+                    .and_then(|col| col.rows.get_mut(r))
+                {
+                    if cell.id == EMPTY {
+                        cell.id = window;
+                        self.relayout_split(si);
+                        self.assist_after_fill(split);
+                    }
+                }
+            }
+            return;
+        }
         self.leave_split(window);
         if let Some(frame) = self.join_split(member, window, side) {
             if let Some(idx) = self.index_of_id(window) {
@@ -921,10 +963,10 @@ mod tests {
     #[test]
     fn dropping_on_a_member_picks_its_nearest_side() {
         let s = two_columns();
-        let (m, side, half) = s.drop_target((900.0, 300.0).into(), 10.0, 0).unwrap();
+        let (m, side, half, _) = s.drop_target((900.0, 300.0).into(), 10.0, 0).unwrap();
         assert_eq!((m, side), (20, Dir::Right));
         assert_eq!(half, rect(760.0, 0.0, 250.0, 600.0));
-        let (_, side, _) = s.drop_target((760.0, 50.0).into(), 10.0, 0).unwrap();
+        let (_, side, _, _) = s.drop_target((760.0, 50.0).into(), 10.0, 0).unwrap();
         assert_eq!(side, Dir::Up);
         assert!(s.drop_target((505.0, 300.0).into(), 10.0, 0).is_none());
     }

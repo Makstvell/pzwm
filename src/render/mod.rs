@@ -116,6 +116,9 @@ pub struct RenderCache {
     groups: HashMap<(String, String), ShaderElement>,
     /// Split outlines by output and split id.
     splits: HashMap<(String, u64), ShaderElement>,
+    /// Empty places of splits (and their "+" bars) by output, split, cell
+    /// and part.
+    places: HashMap<(String, u64, usize, u8), ShaderElement>,
     /// Drawing segments by output, stroke id and segment index.
     drawings: HashMap<(String, u64, usize), ShaderElement>,
     /// Semantic-zoom cards by window id.
