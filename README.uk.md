@@ -9,43 +9,51 @@
 
 **1. Рух і зум**
 
-https://github.com/user-attachments/assets/80dc6676-0ce2-4711-909a-0cd07370d726
+https://github.com/user-attachments/assets/7a01a215-18f5-4fff-80cd-590f15bd0bb4
 
 **2. Відкриття вікон**
 
-https://github.com/user-attachments/assets/2545b96e-a037-4c10-bad6-c860371ea3ec
+https://github.com/user-attachments/assets/66adfd73-38ee-48d5-a957-63ed5352d8ee
 
 **3. Вписати в екран та ідеальний розмір**
 
-https://github.com/user-attachments/assets/551bd2a2-05af-48ad-8af7-768fea7bd2db
+https://github.com/user-attachments/assets/f9eb5358-8977-4f83-9933-38082595c8d1
 
 **4. Мінікарта, групи, розміщення**
 
-https://github.com/user-attachments/assets/c7dd4721-93db-42c3-a4ae-c4440ee013f3
+https://github.com/user-attachments/assets/b5d0699e-e482-4808-a3d8-09236fa4fed8
 
-**5. Презентація**
+**5. Клавіатура**
 
-https://github.com/user-attachments/assets/e94859a7-0d1c-4bd1-946e-4373adfd7eb1
+https://github.com/user-attachments/assets/b9635e44-cf04-4af7-9bcc-24cf1f6c262c
 
-**6. Закріплення, половини, сітка**
+**6. Презентація**
 
-https://github.com/user-attachments/assets/bb9c0e4c-f5f6-46e9-b597-f43bf5584286
+https://github.com/user-attachments/assets/28500d1c-7243-4fa6-980f-4ca7662ba639
 
-**7. Пошук**
+**7. Закріплення, половини, сітка**
 
-https://github.com/user-attachments/assets/925c13e8-2edd-4a59-bff9-b3f961ca5637
+https://github.com/user-attachments/assets/57e0c885-ad2c-442b-ad15-69a470ca6404
 
-**8. Малювання на полотні**
+**8. Пошук**
 
-https://github.com/user-attachments/assets/797b3ce6-0acd-49f7-ba54-239ba3d6a8a9
+https://github.com/user-attachments/assets/913cc4ae-82f8-450d-9b8e-d72bbd361bf8
 
-**9. Налаштування й профілі**
+**9. Малювання на полотні**
 
-https://github.com/user-attachments/assets/3d4b0605-872e-42a9-958f-d64265e03f3a
+https://github.com/user-attachments/assets/9933db8f-07fc-4ca6-84e6-8147bae27643
 
-**10. Воркспейси**
+**10. Спліти**
 
-https://github.com/user-attachments/assets/67c46574-3bdd-416f-9a81-e1b22c3bd2a4
+https://github.com/user-attachments/assets/635fe3c1-f84b-4874-a184-c8592245089d
+
+**11. Налаштування й профілі**
+
+https://github.com/user-attachments/assets/3747d21f-5f94-46f9-9b49-10f32c85456d
+
+**12. Воркспейси**
+
+https://github.com/user-attachments/assets/a62991ff-a1df-493d-95f0-2be2b844fdd9
 
 ### Три режими відкриття вікон
 
