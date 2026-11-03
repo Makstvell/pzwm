@@ -29,7 +29,7 @@ use smithay::{
     utils::{Logical, Point, Rectangle, Size},
 };
 
-use crate::{action::Dir, canvas::Camera, numbering::Numbering, shell::Placement, state::State};
+use crate::{action::Dir, numbering::Numbering, shell::Placement, state::State};
 
 /// How long a picked area waits for its window.
 pub const AREA_TIMEOUT: Duration = Duration::from_secs(60);
@@ -103,6 +103,13 @@ pub fn beside(
         })
         .unwrap_or(candidates[0])
 }
+
+/// A focused window at least this share of the view (either way) fills it.
+const FILLS_VIEW: f64 = 0.85;
+
+/// Where an app's further window goes (content top-left) and the content
+/// size to give it, if any.
+pub type SiblingSpot = (Point<f64, Logical>, Option<Size<i32, Logical>>);
 
 /// A window moved along to make room: its id and how far.
 pub type Push = (u64, Point<f64, Logical>);
@@ -196,7 +203,7 @@ pub fn pick_title(app: &str, number: usize, after: usize) -> String {
 /// Notification body: the keys, then the apps still waiting.
 pub fn pick_body(rest: &[String]) -> String {
     let keys =
-        "Drag out its area · Enter, arrows or h j k l: beside the focused window · Esc: the middle";
+        "Drag out its area · Enter: the middle at the ideal size · arrows or h j k l: beside the focused window · Esc: the middle";
     if rest.is_empty() {
         return keys.into();
     }
@@ -407,12 +414,13 @@ impl State {
         let output = self.active_output().ok_or("no output")?;
         let ws = self.output_ws(&output);
         let waiting = self.area.window;
-        // Nothing focused to go beside: the middle of the view, still at
-        // the ideal size.
-        let Some(rect) = self
-            .beside_focused(&output, ws, waiting, side)
-            .or_else(|| self.ideal_in_view(&output, ws))
-        else {
+        // Enter: the middle of the view at the ideal size. An arrow: on
+        // that side of the focused window (the middle with none focused).
+        let beside = match side {
+            Some(side) => self.beside_focused(&output, ws, waiting, Some(side)),
+            None => None,
+        };
+        let Some(rect) = beside.or_else(|| self.ideal_in_view(&output, ws)) else {
             self.cancel_area();
             return Ok("the middle of the view".into());
         };
@@ -420,11 +428,13 @@ impl State {
         if self.interaction.is_none() {
             self.cursor_override = None;
         }
-        self.center_on_rect(&output, ws, rect);
         if let Some(id) = self.area.window.take() {
             self.show_picked(id, Some((ws, rect)));
+            if let Some(idx) = self.index_of_id(id) {
+                self.reveal_frame(&output, ws, rect, idx);
+            }
             self.pick_next_window();
-            return Ok("placed beside the focused window".into());
+            return Ok("placed".into());
         }
         self.set_pending_area(ws, rect);
         if let Some(cmd) = self.area.spawn.take() {
@@ -446,15 +456,27 @@ impl State {
             .find(|o| self.output_ws(o) == ws)
             .cloned()
             .or_else(|| self.active_output());
+        // A fullscreen or fitted window fills the view: nothing to go
+        // beside, the new window opens in the middle.
+        let fills_view = output
+            .as_ref()
+            .is_some_and(|o| self.focused_fills_view(o, ws));
         let rect = output.as_ref().and_then(|o| {
-            self.beside_focused(o, ws, Some(id), None)
+            let beside = if fills_view {
+                None
+            } else {
+                self.beside_focused(o, ws, Some(id), None)
+            };
+            beside
                 .or_else(|| self.ideal_in_view(o, ws))
                 .map(|r| (o.clone(), r))
         });
         match rect {
             Some((output, rect)) => {
-                self.center_on_rect(&output, ws, rect);
                 self.show_picked(id, Some((ws, rect)));
+                if let Some(idx) = self.index_of_id(id) {
+                    self.reveal_frame(&output, ws, rect, idx);
+                }
             }
             None => {
                 let window = self.windows[idx].window.clone();
@@ -507,10 +529,15 @@ impl State {
         let gap = (self.config.appearance.gaps as f64).max(MIN_SIBLING_GAP);
         let side = side.unwrap_or_else(|| reading_side(self.numbering()));
         let (loc, moves) = insert_beside(anchor, size, &others, gap, side);
+        let mut pushed = Vec::new();
         for (id, delta) in moves {
             if let Some(idx) = self.index_of_id(id) {
                 self.windows[idx].pos += delta;
+                pushed.push((id, delta, self.windows[idx].pos));
             }
+        }
+        if let Some(i) = skip.and_then(|id| self.index_of_id(id)) {
+            self.windows[i].pushed = pushed;
         }
         Some(Rectangle::new(loc, size))
     }
@@ -531,14 +558,44 @@ impl State {
         ))
     }
 
-    /// Moves the camera of `ws` (at its zoom) so `rect` is in the middle.
-    fn center_on_rect(&mut self, output: &Output, ws: usize, rect: Rectangle<f64, Logical>) {
-        let area = self.usable_area(output).to_f64();
-        let zoom = self.workspace(ws).target().zoom;
-        let cam = Camera::centered_on(rect, area, zoom);
-        let dur = self.camera_duration();
-        self.workspace_mut(ws).animate_to(cam, dur, Instant::now());
-        self.queue_redraw(output);
+    /// Brings a newly placed window into view without zooming: the camera
+    /// only pans, and only when the window would be out of sight.
+    fn reveal_frame(
+        &mut self,
+        output: &Output,
+        ws: usize,
+        rect: Rectangle<f64, Logical>,
+        idx: usize,
+    ) {
+        let view = self
+            .workspace(ws)
+            .target()
+            .visible(self.usable_area(output).to_f64());
+        if !view.overlaps(rect) {
+            self.reveal(idx);
+        }
+    }
+
+    /// The focused window on `ws` covers most of the view: fullscreen,
+    /// maximized, or fitted (`fit`).
+    pub fn focused_fills_view(&self, output: &Output, ws: usize) -> bool {
+        let Some(m) = self.focused_index().map(|i| &self.windows[i]) else {
+            return false;
+        };
+        if m.placement != Placement::Canvas {
+            return true;
+        }
+        if m.ws != ws {
+            return false;
+        }
+        let view = self
+            .workspace(ws)
+            .target()
+            .visible(self.usable_area(output).to_f64());
+        let frame = self.canvas_frame(m);
+        let covered = |a: f64, b: f64| a >= b * FILLS_VIEW;
+        frame.overlaps(view)
+            && (covered(frame.size.w, view.size.w) || covered(frame.size.h, view.size.h))
     }
 
     /// A window that is gone or got its place from a rule needs no pick.
@@ -719,9 +776,10 @@ impl State {
     }
 
     /// Top-left (content, below the title) for a new window of an app that
-    /// already shows one on `ws`: beside it, or over it for a dialog-sized
-    /// window. `None` when the app has no other window there.
-    pub fn sibling_spot(&self, idx: usize, ws: usize) -> Option<Point<f64, Logical>> {
+    /// already shows one on `ws`: over it for a dialog-sized window, else
+    /// beside it at the ideal size (the content size to give it comes
+    /// along). `None` when the app has no other window there.
+    pub fn sibling_spot(&self, idx: usize, ws: usize) -> Option<SiblingSpot> {
         if !self.config.canvas.place_near_siblings {
             return None;
         }
@@ -751,11 +809,30 @@ impl State {
         let size = m.size();
         let frame = Size::from((size.w, size.h + title));
         if frame.w <= sib.size.w * DIALOG_SHARE && frame.h <= sib.size.h * DIALOG_SHARE {
-            return Some(Point::from((
-                sib.loc.x + (sib.size.w - frame.w) / 2.0,
-                sib.loc.y + (sib.size.h - frame.h) / 2.0 + title,
-            )));
+            return Some((
+                Point::from((
+                    sib.loc.x + (sib.size.w - frame.w) / 2.0,
+                    sib.loc.y + (sib.size.h - frame.h) / 2.0 + title,
+                )),
+                None,
+            ));
         }
+        // A full window of its own: the ideal size.
+        let ideal = self
+            .outputs
+            .iter()
+            .find(|o| self.output_ws(o) == ws)
+            .and_then(|o| self.ideal_sizes(o).first().map(|i| i.size));
+        let (frame, resize) = match ideal {
+            Some(s) => (
+                s,
+                Some(Size::from((
+                    s.w.round() as i32,
+                    (s.h - title).round().max(1.0) as i32,
+                ))),
+            ),
+            None => (frame, None),
+        };
         let others: Vec<_> = self
             .windows
             .iter()
@@ -770,7 +847,7 @@ impl State {
             .collect();
         let gap = (self.config.appearance.gaps as f64).max(MIN_SIBLING_GAP);
         let top_left = beside(sib, frame, &others, gap);
-        Some(Point::from((top_left.x, top_left.y + title)))
+        Some((Point::from((top_left.x, top_left.y + title)), resize))
     }
 }
 

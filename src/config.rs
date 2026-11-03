@@ -119,6 +119,10 @@ pub struct Canvas {
     /// Middle-drag pans even over windows; a middle click without moving
     /// still reaches the app (paste, open link in new tab).
     pub middle_drag_over_windows: bool,
+    /// Pan and zoom only with Super held (the `[mouse]` Super binds): plain
+    /// scrolling and middle- or left-dragging never move the canvas, so
+    /// games and apps get every click and scroll.
+    pub super_navigation: bool,
     /// Distance in screen pixels at which dragged windows snap to edges.
     pub snap_distance: f64,
     /// Dragging a window to the left/right screen edge tiles it to a half.
@@ -494,6 +498,7 @@ impl Default for Canvas {
             wheel_zooms: true,
             left_drag_pans: true,
             middle_drag_over_windows: true,
+            super_navigation: false,
             snap_distance: 14.0,
             edge_tiling: true,
             pan_step: 160.0,

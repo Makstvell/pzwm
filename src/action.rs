@@ -67,6 +67,8 @@ pub enum Action {
     Dpms(String),
     /// Start the lock screen.
     Lock,
+    /// Take the keyboard shortcuts and the pointer back from a game.
+    ReleaseInput,
     /// `tile [left|right|up|down|grow DIR|apply|cancel]`: put the focused
     /// window on cells of a grid over the screen, see tile.rs.
     Tile(String),
@@ -141,6 +143,7 @@ impl Action {
             "area" => Self::Area(arg.to_string()),
             "dpms" | "screens" => Self::Dpms(arg.to_string()),
             "lock" | "lock-session" => Self::Lock,
+            "release-input" => Self::ReleaseInput,
             "tile" | "grid" => Self::Tile(arg.to_string()),
             "arrange" => Self::Arrange(crate::arrange::Arrangement::parse(arg)?),
             "present" | "presentation" => Self::Present(arg.to_string()),

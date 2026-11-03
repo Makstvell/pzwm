@@ -60,6 +60,10 @@ max_zoom = 3.0
 wheel_zooms = true      # wheel on empty canvas: zoom (true) or pan (false)
 left_drag_pans = true   # left-drag on empty canvas pans, like middle-drag
 middle_drag_over_windows = true  # middle-drag pans over windows too; a plain middle click still reaches the app
+# Pan and zoom only with Super held (Super+scroll, Super+middle/left drag):
+# plain scrolling and dragging never move the canvas, so games and apps get
+# every click and scroll.
+super_navigation = false
 snap_distance = 14.0    # magnetic edges while dragging, in screen pixels
 edge_tiling = true      # drop a window on the left/right screen edge to tile it
 pan_step = 160.0        # keyboard pan step
@@ -84,11 +88,16 @@ place_near_siblings = true
 # Where any other new window opens:
 #   "center"  the middle of the view;
 #   "pick"    it waits until you drag out its area and takes exactly that
-#             area (Enter: beside the focused window in the order below,
-#             arrows or h j k l: on that side of it; Escape: the middle);
+#             area (Enter: the middle of the view at the ideal size, arrows
+#             or h j k l: beside the focused window on that side; Escape:
+#             the middle at its own size);
 #   "beside"  at the ideal size right next to the focused window, in the
 #             order of [general] window_numbers: right for rows, below for
-#             columns, left for rows-rtl; windows already there move along.
+#             columns, left for rows-rtl; windows already there move along
+#             (and back when it closes). A fullscreen or fitted focused
+#             window: the middle of the view instead.
+# Opening a window never zooms; the camera only pans when it would be out
+# of sight.
 # Dialogs and an app's further windows never wait.
 new_window_placement = "center"
 # Cells of the Super+T grid, "COLSxROWS" (up to 12x12): 6x4 makes halves,
@@ -398,6 +407,8 @@ locked_screen_off_after = 60          # once locked, screens off after 1 min
 "Super+F5" = "present"
 "Super+Next" = "present next"
 "Super+Prior" = "present prev"
+# Super+Escape (built in, always works): take the keyboard and the mouse
+# back from a game that holds them; click the game to give them back.
 # Lock the screen; turn the screens off.
 "Super+L" = "lock"
 "Super+Shift+Escape" = "dpms off"

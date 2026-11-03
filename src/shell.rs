@@ -113,7 +113,13 @@ pub struct Managed {
     pub late_rules: Option<Instant>,
     /// "pick" placement: hidden until its place is dragged out, see area.rs.
     pub awaiting_pick: bool,
+    /// Windows this one pushed along when it opened (id, how far, where
+    /// they ended up); they move back when it closes, unless moved since.
+    pub pushed: Vec<Pushed>,
 }
+
+/// A window pushed aside by another one: id, how far, where it ended up.
+pub type Pushed = (u64, Point<f64, Logical>, Point<f64, Logical>);
 
 impl Managed {
     /// 0..1 progress of the open animation (1 when done or disabled).
@@ -438,6 +444,7 @@ impl State {
                 area: None,
                 late_rules: None,
                 awaiting_pick: false,
+                pushed: Vec::new(),
             },
         );
     }
@@ -572,7 +579,7 @@ impl State {
         };
         if let Some((_, rect)) = area {
             pos = Point::from((rect.loc.x, rect.loc.y + title));
-        } else if let Some(spot) = sibling {
+        } else if let Some((spot, _)) = sibling {
             pos = spot;
         } else if parent_frame.is_none() {
             while self.windows.iter().any(|o| {
@@ -633,8 +640,12 @@ impl State {
                     self.configure(idx, Some(content), false, false);
                 }
             } else if (sibling.is_some() || parent_frame.is_some()) && !ruled && !from_profile {
-                // A child window: show it, at most at 100 % so it stays sharp.
-                self.fit_window_at_most(idx, 1.0);
+                // An app's further window takes the ideal size beside its
+                // sibling; the camera only pans when it is out of view.
+                if let Some((_, Some(size))) = sibling {
+                    self.configure(idx, Some(size), false, false);
+                }
+                self.reveal(idx);
             }
         }
         self.queue_redraw_all();
@@ -689,6 +700,16 @@ impl State {
         };
         let removed = self.windows.remove(idx);
         self.forget_pick(removed.id);
+        // The windows it pushed aside close the gap again.
+        for (id, delta, ended_at) in &removed.pushed {
+            if let Some(i) = self.index_of_id(*id) {
+                let m = &mut self.windows[i];
+                let d = m.pos - *ended_at;
+                if d.x.abs() < 1.0 && d.y.abs() < 1.0 && m.ws == removed.ws {
+                    m.pos -= *delta;
+                }
+            }
+        }
         if let Some(
             crate::grabs::Interaction::Move { id, .. }
             | crate::grabs::Interaction::Resize { id, .. },

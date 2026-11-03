@@ -199,6 +199,9 @@ pub struct State {
     pub lock: LockState,
     pub lock_surfaces: HashMap<String, LockSurface>,
     pub idle_inhibitors: Vec<WlSurface>,
+    /// A window whose keyboard-shortcut inhibitor and pointer lock were let
+    /// go with Super+Escape; they come back when it is clicked.
+    pub input_released: Option<WlSurface>,
     /// Dimming, screens off, lock and sleep when idle (idle.rs).
     pub idle: crate::idle::IdleState,
     /// The color scheme last applied (theme.rs).
@@ -411,6 +414,7 @@ impl State {
             lock: LockState::default(),
             lock_surfaces: HashMap::new(),
             idle_inhibitors: Vec::new(),
+            input_released: None,
             idle: Default::default(),
             applied_scheme: None,
             render_cache: RenderCache::default(),

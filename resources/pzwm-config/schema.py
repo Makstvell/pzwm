@@ -77,6 +77,7 @@ PAGES = (
             Option("new_window_height", "New window height", "float", "Share of the screen", 0.1, 1, 0.05),
             Option("start_zoom", "Start zoom", "float", "Zoom each workspace starts at and Super+Home goes back to; 0.667 shows about 1.5 screens", 0.1, 2, 0.05),
             Option("semantic_zoom", "Semantic zoom below", "float", "Zoom under which windows become app cards; 0 turns it off", 0, 1, 0.05),
+            Option("super_navigation", "Pan and zoom only with Super", "bool", "Plain scrolling and dragging never move the canvas (good for games)"),
             Option("new_window_placement", "Where new windows open", "choice", "pick: drag out the place of each new window (Enter: beside the focused one); beside: ideal size next to the focused window; dialogs and an app's further windows open by their own", choices=("center", "pick", "beside")),
             Option("tile_grid", "Tile grid (Super+T)", "str", "Columns x rows, e.g. 6x4"),
             Option("tile_mode", "Tile and snap at", "choice", "zoom: go to 100 % first (real pixels); pin: pin at 1:1; canvas: the current zoom", choices=("zoom", "pin", "canvas")),

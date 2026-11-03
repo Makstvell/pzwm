@@ -759,13 +759,15 @@ impl KeyboardShortcutsInhibitHandler for State {
     }
 
     fn new_inhibitor(&mut self, inhibitor: KeyboardShortcutsInhibitor) {
-        inhibitor.activate();
+        if self.input_released.as_ref() != Some(inhibitor.wl_surface()) {
+            inhibitor.activate();
+        }
     }
 }
 
 impl PointerConstraintsHandler for State {
     fn new_constraint(&mut self, surface: &WlSurface, pointer: &PointerHandle<Self>) {
-        if pointer.current_focus().as_ref() == Some(surface) {
+        if pointer.current_focus().as_ref() == Some(surface) && !self.input_held_back(surface) {
             with_pointer_constraint(surface, pointer, |c| {
                 if let Some(c) = c {
                     c.activate();

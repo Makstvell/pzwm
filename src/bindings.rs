@@ -73,6 +73,16 @@ impl State {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::SwitchVt(vt)));
                 }
+                // Super+Escape always works, also when a game holds the
+                // keyboard and the pointer: it gives them back.
+                if !locked
+                    && mods.logo
+                    && !(mods.shift || mods.ctrl || mods.alt)
+                    && handle.modified_syms().contains(&Keysym::Escape)
+                {
+                    state.suppressed_keys.push(keycode);
+                    return FilterResult::Intercept(Some(Action::ReleaseInput));
+                }
                 if locked || inhibited {
                     return FilterResult::Forward;
                 }
@@ -135,6 +145,39 @@ impl State {
                 popup.key.get_or_insert(keycode);
             }
         }
+    }
+
+    /// Super+Escape: the focused window lets go of the keyboard shortcuts
+    /// and the pointer (a game that locked them) until it is clicked again.
+    pub fn release_input(&mut self) {
+        let Some(surface) = self
+            .focused
+            .as_ref()
+            .and_then(|w| w.toplevel())
+            .map(|t| t.wl_surface().clone())
+        else {
+            return;
+        };
+        if let Some(inhibitor) = self.seat.keyboard_shortcuts_inhibitor_for_surface(&surface) {
+            inhibitor.inactivate();
+        }
+        let pointer = self.pointer.clone();
+        // The pointer may be locked on a subsurface of the window.
+        let mut surfaces = vec![surface.clone()];
+        if let Some(focus) = pointer.current_focus() {
+            surfaces.push(focus);
+        }
+        for s in &surfaces {
+            smithay::wayland::pointer_constraints::with_pointer_constraint(s, &pointer, |c| {
+                if let Some(c) = c.filter(|c| c.is_active()) {
+                    c.deactivate();
+                }
+            });
+        }
+        self.input_released = Some(surface);
+        self.spawn(
+            "notify-send -a pzwm -t 3000 -h string:x-canonical-private-synchronous:pzwm-input              'Keyboard and mouse released' 'Click the window to give them back'",
+        );
     }
 
     fn shortcuts_inhibited(&self) -> bool {
@@ -206,6 +249,7 @@ impl State {
                 self.notify_result("dpms", result, false);
             }
             Action::Lock => self.lock_session(),
+            Action::ReleaseInput => self.release_input(),
             Action::IdealSize => {
                 if let Some(i) = focused {
                     self.ideal_size(i);

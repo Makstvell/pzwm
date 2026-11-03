@@ -216,6 +216,42 @@ impl State {
         }
     }
 
+    /// Whether `surface` belongs to the window released with Super+Escape.
+    pub fn input_held_back(&self, surface: &WlSurface) -> bool {
+        let Some(released) = &self.input_released else {
+            return false;
+        };
+        if surface == released {
+            return true;
+        }
+        let root =
+            smithay::wayland::compositor::get_parent(surface).unwrap_or_else(|| surface.clone());
+        &root == released
+    }
+
+    /// A click on the released window: its pointer lock and shortcut
+    /// inhibitor apply again.
+    fn give_input_back(&mut self, idx: usize) {
+        let Some(released) = self.input_released.clone() else {
+            return;
+        };
+        let surface = self.windows[idx]
+            .window
+            .toplevel()
+            .map(|t| t.wl_surface().clone());
+        if surface.as_ref() != Some(&released) {
+            return;
+        }
+        self.input_released = None;
+        use smithay::wayland::keyboard_shortcuts_inhibit::KeyboardShortcutsInhibitorSeat;
+        if let Some(inhibitor) = self
+            .seat
+            .keyboard_shortcuts_inhibitor_for_surface(&released)
+        {
+            inhibitor.activate();
+        }
+    }
+
     pub fn notify_activity(&mut self) {
         let seat = self.seat.clone();
         self.idle_notifier_state.notify_activity(&seat);
@@ -316,8 +352,9 @@ impl State {
         pointer.frame(self);
 
         if let Some((surface, surface_loc)) = focus {
+            let held_back = self.input_held_back(&surface);
             with_pointer_constraint(&surface, &pointer, |constraint| {
-                if let Some(c) = constraint.filter(|c| !c.is_active()) {
+                if let Some(c) = constraint.filter(|c| !c.is_active() && !held_back) {
                     let point = (location - surface_loc).to_i32_round();
                     if c.region().is_none_or(|r| r.contains(point)) {
                         c.activate();
@@ -487,6 +524,7 @@ impl State {
             match button_state {
                 ButtonState::Pressed
                     if self.config.canvas.middle_drag_over_windows
+                        && !self.config.canvas.super_navigation
                         && self.mouse_bind(MouseTrigger::Button(BTN_MIDDLE)).is_none()
                         && matches!(
                             self.under(),
@@ -591,6 +629,7 @@ impl State {
             Under::Surface {
                 window: Some(idx), ..
             } => {
+                self.give_input_back(idx);
                 let window = self.windows[idx].window.clone();
                 if self.focused.as_ref() != Some(&window) || self.layer_focus.is_some() {
                     self.focus_window(Some(window));
@@ -631,7 +670,9 @@ impl State {
                             grabs::start_move_with_button(self, idx, serial, button);
                         }
                     }
-                    (Hit::Title, BTN_MIDDLE) => grabs::start_pan(self, serial, button),
+                    (Hit::Title, BTN_MIDDLE) if !self.config.canvas.super_navigation => {
+                        grabs::start_pan(self, serial, button)
+                    }
                     (Hit::Edge(edges), BTN_LEFT) => {
                         grabs::start_resize_with_button(self, idx, edges, serial, button)
                     }
@@ -653,8 +694,9 @@ impl State {
                         self.focus_window(None);
                     }
                 }
-                let pans = button == BTN_MIDDLE
-                    || (button == BTN_LEFT && self.config.canvas.left_drag_pans);
+                let pans = !self.config.canvas.super_navigation
+                    && (button == BTN_MIDDLE
+                        || (button == BTN_LEFT && self.config.canvas.left_drag_pans));
                 if pans {
                     grabs::start_pan(self, serial, button);
                 }
@@ -916,6 +958,9 @@ impl State {
         zoom: impl FnOnce(&mut Self),
     ) {
         let anchor = self.cursor_local(output);
+        if self.config.canvas.super_navigation {
+            return;
+        }
         if wheel && !shift && self.config.canvas.wheel_zooms {
             zoom(self);
         } else if ctrl && !wheel {
