@@ -484,7 +484,9 @@ impl State {
         // Snapped somewhere new: out of its split; it may join one again
         // with the window it now lines up with.
         let id = self.windows[idx].id;
-        self.leave_split(id);
+        if !self.split_is_away(id) {
+            self.leave_split(id);
+        }
         let Some(idx) = self.index_of_id(id) else {
             return;
         };
@@ -526,7 +528,9 @@ impl State {
             (canvas_rect.size.h - title).round().max(1.0) as i32,
         ));
         self.configure(idx, Some(size), false, false);
-        self.link_snapped(idx);
+        if self.split_index_of(id).is_none() {
+            self.link_snapped(idx);
+        }
         self.queue_redraw_all();
     }
 }

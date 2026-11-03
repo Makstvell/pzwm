@@ -2,7 +2,8 @@
 // Copyright 2026 Maksym Shymchenko (Makstvell)
 
 //! Group frames: a tinted rounded rectangle behind each group's windows,
-//! filled stronger while the group is collapsed.
+//! filled stronger while the group is collapsed. Splits get a thin outline
+//! a little outside their windows, brighter while one of them is focused.
 
 use smithay::{
     output::Output,
@@ -66,6 +67,61 @@ pub(super) fn group_elements<R: PzRenderer>(
             .render_cache
             .groups
             .entry((name.clone(), frame.name))
+            .or_default();
+        out.push(PzElement::Shader(
+            elem.update(&sh.rect, phys_rect(rect, os), 1.0, &uniforms)
+                .clone(),
+        ));
+    }
+}
+
+/// Space between a split's windows and its outline, screen pixels.
+const SPLIT_PAD: f64 = 7.0;
+const SPLIT_BORDER: f64 = 1.5;
+
+pub(super) fn split_elements<R: PzRenderer>(
+    state: &mut State,
+    output: &Output,
+    os: f64,
+    sh: &Shaders,
+    out: &mut Vec<PzElement<R>>,
+) {
+    let ws = state.output_ws(output);
+    let outlines = state.split_outlines(ws);
+    let name = output.name();
+    state
+        .render_cache
+        .splits
+        .retain(|(o, id), _| *o != name || outlines.iter().any(|(s, _, _)| s == id));
+    let cam = state.camera(output);
+    let screen = Rectangle::from_size(state.output_geometry(output).size.to_f64());
+    let [r, g, b, _] = state.config.appearance.active_border_start;
+    let radius = state.config.appearance.corner_radius as f64 * cam.zoom + SPLIT_PAD;
+    for (id, area, focused) in outlines {
+        let inner: Rectangle<f64, Logical> =
+            Rectangle::new(cam.to_screen(area.loc), area.size.upscale(cam.zoom));
+        let rect = Rectangle::new(
+            (inner.loc.x - SPLIT_PAD, inner.loc.y - SPLIT_PAD).into(),
+            (
+                inner.size.w + 2.0 * SPLIT_PAD,
+                inner.size.h + 2.0 * SPLIT_PAD,
+            )
+                .into(),
+        );
+        if !rect.overlaps(screen) {
+            continue;
+        }
+        let stroke = if focused { 0.85 } else { 0.35 };
+        let uniforms = [
+            ("u_fill", ShaderValue::F4([r, g, b, 0.0])),
+            ("u_stroke", ShaderValue::F4([r, g, b, stroke])),
+            ("u_radius", ShaderValue::F1((radius * os) as f32)),
+            ("u_border", ShaderValue::F1((SPLIT_BORDER * os) as f32)),
+        ];
+        let elem = state
+            .render_cache
+            .splits
+            .entry((name.clone(), id))
             .or_default();
         out.push(PzElement::Shader(
             elem.update(&sh.rect, phys_rect(rect, os), 1.0, &uniforms)

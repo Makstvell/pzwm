@@ -896,9 +896,9 @@ impl State {
         let Some(output) = self.output_of(idx) else {
             return;
         };
-        // Out of the canvas layout: out of its split too.
+        // Its place in a split stays free until it is restored.
         let id = self.windows[idx].id;
-        self.leave_split(id);
+        self.split_set_away(id, true);
         let Some(idx) = self.index_of_id(id) else {
             return;
         };
@@ -924,9 +924,9 @@ impl State {
         let Some(output) = self.output_of(idx) else {
             return;
         };
-        // Out of the canvas layout: out of its split too.
+        // Its place in a split stays free until it is restored.
         let id = self.windows[idx].id;
-        self.leave_split(id);
+        self.split_set_away(id, true);
         let Some(idx) = self.index_of_id(id) else {
             return;
         };
@@ -954,7 +954,10 @@ impl State {
         m.output = r.output;
         m.ws = r.ws;
         m.opened_at = Some(Instant::now());
+        let id = m.id;
         self.configure(idx, Some(r.size), false, false);
+        // Back to its place in a split, if it has one.
+        self.split_set_away(id, false);
         self.queue_redraw_all();
     }
 

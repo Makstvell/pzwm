@@ -320,6 +320,7 @@ impl State {
                     m.ws = ws;
                 }
                 self.configure(idx, Some(old), false, false);
+                self.split_set_away(id, false);
                 self.queue_redraw_all();
                 return;
             }
@@ -354,6 +355,8 @@ impl State {
             )),
             frame,
         );
+        // In a split: its place waits for it while it is at the ideal size.
+        self.split_set_away(id, true);
         self.place_in_screen_rect(idx, &output, rect);
         let title = self.title_height(&self.windows[idx]);
         let zoom = match self.windows[idx].placement {

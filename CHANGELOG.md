@@ -9,6 +9,15 @@ landed on `main`. pzwm has no tagged release yet, so everything is under
 ### 2026-11-03: splits
 
 **Added**
+- Splits keep their windows: a member that is maximized, fullscreen or
+  at its ideal size leaves its place free and goes back there when
+  restored. `Super+C` on a member fits the whole split, again the window.
+- A thin outline a little outside each split, brighter while one of its
+  windows is focused.
+- Drag any window by its title over a split's window: the half it would
+  take lights up, and dropping it there adds it to the split. The same
+  rearranges members; `Super+Ctrl` + arrows swap a member with its
+  neighbour on that side.
 - **Splits**: windows tiled together over one area of the canvas, in
   columns that each hold one or more rows. Drag the gap (or the shared
   edge) between two and both resize, like snapped windows in Windows;
@@ -21,8 +30,8 @@ landed on `main`. pzwm has no tagged release yet, so everything is under
   right, a new row above or below.
 - Windows snapped next to each other (halves, thirds, quarters, the tile
   grid) join up into a split by themselves.
-- A window that closes, is maximized, pinned, moved or dragged away by its
-  title leaves its split, and the others take its space.
+- A window that closes, is pinned, moved or dragged out by its title
+  leaves its split, and the others take its space.
 
 **Changed**
 - A window an app opens by itself keeps the size the app gave it again

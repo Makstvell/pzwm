@@ -208,6 +208,8 @@ pub struct State {
     pub splits: Vec<crate::split::Split>,
     pub next_split_id: u64,
     pub split_press: Option<crate::split::LastPress>,
+    /// Where the window being dragged would drop into a split.
+    pub split_drop: Option<crate::split::DropTarget>,
     /// Dimming, screens off, lock and sleep when idle (idle.rs).
     pub idle: crate::idle::IdleState,
     /// The color scheme last applied (theme.rs).
@@ -425,6 +427,7 @@ impl State {
             splits: Vec::new(),
             next_split_id: 1,
             split_press: None,
+            split_drop: None,
             idle: Default::default(),
             applied_scheme: None,
             render_cache: RenderCache::default(),

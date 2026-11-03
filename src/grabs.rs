@@ -546,7 +546,18 @@ impl State {
         let m = &mut self.windows[idx];
         m.ws = ws;
         m.pos = Point::from((snapped.x, snapped.y + title));
-        self.snap_preview = self.edge_tile_target(&output, local);
+        // Over a split: show the half of the window under the cursor it
+        // would take; else the screen-edge tiling preview.
+        match self.split_drop_target(&output, id) {
+            Some((target, rect)) => {
+                self.split_drop = Some(target);
+                self.snap_preview = Some((output.clone(), rect));
+            }
+            None => {
+                self.split_drop = None;
+                self.snap_preview = self.edge_tile_target(&output, local);
+            }
+        }
         self.queue_redraw_all();
     }
 
@@ -724,7 +735,9 @@ impl State {
         let preview = self.snap_preview.take();
         match self.interaction.take() {
             Some(Interaction::Move { id, .. }) => {
-                if let (Some(idx), Some((output, rect))) = (self.index_of_id(id), preview) {
+                if let Some(target) = self.split_drop.take() {
+                    self.split_drop(id, target);
+                } else if let (Some(idx), Some((output, rect))) = (self.index_of_id(id), preview) {
                     let area = self.usable_area(&output).to_f64();
                     if (rect.size.w - area.size.w).abs() < (area.size.w / 4.0) {
                         self.maximize(idx);

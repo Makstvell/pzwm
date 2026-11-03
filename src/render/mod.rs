@@ -114,6 +114,8 @@ pub struct RenderCache {
     hint: ShaderElement,
     /// Group frames by output and group name.
     groups: HashMap<(String, String), ShaderElement>,
+    /// Split outlines by output and split id.
+    splits: HashMap<(String, u64), ShaderElement>,
     /// Drawing segments by output, stroke id and segment index.
     drawings: HashMap<(String, u64, usize), ShaderElement>,
     /// Semantic-zoom cards by window id.
@@ -259,6 +261,7 @@ pub fn scaled_output_elements<R: PzRenderer>(
 
     if let Some(sh) = shaders.as_ref() {
         group_frames::group_elements(state, output, os, sh, &mut out);
+        group_frames::split_elements(state, output, os, sh, &mut out);
         if let Some(grid) = grid_element(state, output, os, sh) {
             out.push(PzElement::Shader(grid));
         }

@@ -397,7 +397,12 @@ back, and they are still together.
 | Resize two at once | drag the gap between them, or the edge they share; double-click it to share evenly |
 | Grow the whole split | drag one of its outer edges |
 | Move the whole split | `Super+Alt` + left drag on any of its windows |
-| Take a window out | `Super+S` on it, drag it away by its title, maximize, pin or close it; the others take its space |
+| See it | a thin outline a little outside its windows, brighter while one of them is focused |
+| Show the whole split | `Super+C` on any of its windows fits the split; press again for that window alone |
+| Drag a window in | drag any window by its title over a window of the split: the half it would take lights up; drop it there |
+| Rearrange | drag a member over another one the same way, or `Super+Ctrl` + arrows: it swaps places with its neighbour on that side |
+| Maximize for a while | maximize, fullscreen or ideal size (`Super+Shift+F`) on a member: its place stays free, and it goes back there when restored |
+| Take a window out | `Super+S` on it, drag it away by its title and drop it outside, pin or close it; the others take its space |
 
 ## Putting windows on the screen: tile grid, halves, corners
 

@@ -39,6 +39,9 @@ const LINE_UP: f64 = 8.0;
 pub struct Cell {
     pub id: u64,
     pub weight: f64,
+    /// Maximized, fullscreen or at its ideal size for now: its place stays
+    /// free and it comes back to it.
+    pub away: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -100,6 +103,7 @@ impl Split {
                 rows: vec![Cell {
                     id: window,
                     weight: 1.0,
+                    away: false,
                 }],
             }],
         }
@@ -150,6 +154,7 @@ impl Split {
                         rows: vec![Cell {
                             id: new,
                             weight: 1.0,
+                            away: false,
                         }],
                     },
                 );
@@ -164,6 +169,7 @@ impl Split {
                     Cell {
                         id: new,
                         weight: share,
+                        away: false,
                     },
                 );
             }
@@ -181,6 +187,126 @@ impl Split {
             self.cols.remove(c);
         }
         true
+    }
+
+    /// Marks `id` away (true) or back (false); false when not a member.
+    pub fn set_away(&mut self, id: u64, away: bool) -> bool {
+        match self.position(id) {
+            Some((c, r)) => {
+                self.cols[c].rows[r].away = away;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn is_away(&self, id: u64) -> bool {
+        self.position(id)
+            .is_some_and(|(c, r)| self.cols[c].rows[r].away)
+    }
+
+    /// Swaps `id` with the member next to it on `side` (by place), like
+    /// moving a snapped window over in Windows. False when there is none.
+    pub fn swap_toward(&mut self, id: u64, side: Dir, gap: f64) -> bool {
+        let frames = self.layout(gap);
+        let Some(&(_, me)) = frames.iter().find(|(m, _)| *m == id) else {
+            return false;
+        };
+        let (cx, cy) = (me.loc.x + me.size.w / 2.0, me.loc.y + me.size.h / 2.0);
+        let overlap = |a0: f64, a1: f64, b0: f64, b1: f64| a0.max(b0) < a1.min(b1);
+        let other = frames
+            .iter()
+            .filter(|(m, r)| {
+                *m != id
+                    && match side {
+                        Dir::Left => {
+                            r.loc.x + r.size.w <= me.loc.x + 1.0
+                                && overlap(
+                                    r.loc.y,
+                                    r.loc.y + r.size.h,
+                                    me.loc.y,
+                                    me.loc.y + me.size.h,
+                                )
+                        }
+                        Dir::Right => {
+                            r.loc.x >= me.loc.x + me.size.w - 1.0
+                                && overlap(
+                                    r.loc.y,
+                                    r.loc.y + r.size.h,
+                                    me.loc.y,
+                                    me.loc.y + me.size.h,
+                                )
+                        }
+                        Dir::Up => {
+                            r.loc.y + r.size.h <= me.loc.y + 1.0
+                                && overlap(
+                                    r.loc.x,
+                                    r.loc.x + r.size.w,
+                                    me.loc.x,
+                                    me.loc.x + me.size.w,
+                                )
+                        }
+                        Dir::Down => {
+                            r.loc.y >= me.loc.y + me.size.h - 1.0
+                                && overlap(
+                                    r.loc.x,
+                                    r.loc.x + r.size.w,
+                                    me.loc.x,
+                                    me.loc.x + me.size.w,
+                                )
+                        }
+                    }
+            })
+            .min_by(|(_, a), (_, b)| {
+                let d = |r: &Rectangle<f64, Logical>| {
+                    let (x, y) = (r.loc.x + r.size.w / 2.0, r.loc.y + r.size.h / 2.0);
+                    (x - cx).powi(2) + (y - cy).powi(2)
+                };
+                d(a).total_cmp(&d(b))
+            })
+            .map(|(m, _)| *m);
+        let (Some(other), Some((c1, r1))) = (other, self.position(id)) else {
+            return false;
+        };
+        let Some((c2, r2)) = self.position(other) else {
+            return false;
+        };
+        let a = self.cols[c1].rows[r1].id;
+        self.cols[c1].rows[r1].id = self.cols[c2].rows[r2].id;
+        self.cols[c2].rows[r2].id = a;
+        true
+    }
+
+    /// Where a window dropped at canvas point `p` goes: next to the member
+    /// under it (not `skip`), on the side of that member `p` is nearest to.
+    pub fn drop_target(
+        &self,
+        p: Point<f64, Logical>,
+        gap: f64,
+        skip: u64,
+    ) -> Option<(u64, Dir, Rectangle<f64, Logical>)> {
+        let (id, r) = self
+            .layout(gap)
+            .into_iter()
+            .find(|(m, r)| *m != skip && !self.is_away(*m) && r.contains(p))?;
+        let dx = (p.x - (r.loc.x + r.size.w / 2.0)) / r.size.w.max(1.0);
+        let dy = (p.y - (r.loc.y + r.size.h / 2.0)) / r.size.h.max(1.0);
+        let side = if dx.abs() >= dy.abs() {
+            if dx < 0.0 { Dir::Left } else { Dir::Right }
+        } else if dy < 0.0 {
+            Dir::Up
+        } else {
+            Dir::Down
+        };
+        // The half of that member the window would take.
+        let (hw, hh) = (r.size.w / 2.0, r.size.h / 2.0);
+        let half = match side {
+            Dir::Left => Rectangle::new(r.loc, (hw, r.size.h).into()),
+            Dir::Right => Rectangle::new((r.loc.x + hw, r.loc.y).into(), (hw, r.size.h).into()),
+            Dir::Up => Rectangle::new(r.loc, (r.size.w, hh).into()),
+            Dir::Down => Rectangle::new((r.loc.x, r.loc.y + hh).into(), (r.size.w, hh).into()),
+        };
+        Some((id, side, half))
     }
 
     pub fn len(&self) -> usize {
@@ -289,6 +415,9 @@ fn shift_pair(a: f64, b: f64, d: f64) -> Option<(f64, f64)> {
     (a + b >= 2.0 * MIN_SPAN).then_some((a + d, b - d))
 }
 
+/// Where a dragged window drops into a split: (split, member, side).
+pub type DropTarget = (u64, u64, Dir);
+
 /// A divider press, for telling a double click.
 #[derive(Clone, Copy, Debug)]
 pub struct LastPress {
@@ -317,6 +446,10 @@ impl State {
             let Some(idx) = self.index_of_id(id) else {
                 continue;
             };
+            // Maximized for now: it comes back when restored.
+            if self.splits[si].is_away(id) {
+                continue;
+            }
             let title = self.title_height(&self.windows[idx]);
             let m = &mut self.windows[idx];
             m.ws = ws;
@@ -557,6 +690,120 @@ impl State {
     }
 }
 
+impl State {
+    /// A member goes away (maximize, fullscreen, ideal size) or comes back
+    /// to its place in the split.
+    pub fn split_set_away(&mut self, window: u64, away: bool) {
+        let Some(si) = self.split_index_of(window) else {
+            return;
+        };
+        self.splits[si].set_away(window, away);
+        if !away {
+            self.relayout_split(si);
+        }
+    }
+
+    pub fn split_is_away(&self, window: u64) -> bool {
+        self.split_index_of(window)
+            .is_some_and(|si| self.splits[si].is_away(window))
+    }
+
+    /// `fit` on a split member shows the whole split; pressed again when it
+    /// already does, the window alone. False when `window` is in no split.
+    pub fn fit_split(&mut self, window: u64) -> bool {
+        let Some(si) = self.split_index_of(window) else {
+            return false;
+        };
+        if self.splits[si].is_away(window) {
+            return false;
+        }
+        let (ws, rect) = (self.splits[si].ws, self.splits[si].rect);
+        let Some(output) = self
+            .outputs
+            .iter()
+            .find(|o| self.output_ws(o) == ws)
+            .cloned()
+        else {
+            return false;
+        };
+        let canvas = &self.config.canvas;
+        let area = self.usable_area(&output).to_f64();
+        let gap = self.config.appearance.gaps as f64;
+        let cam = crate::canvas::Camera::fitting(rect, area, gap, canvas.min_zoom, canvas.max_zoom);
+        let now = self.workspace(ws).target();
+        let same = (now.zoom - cam.zoom).abs() < 1e-3
+            && (now.pos.x - cam.pos.x).abs() < 1.0
+            && (now.pos.y - cam.pos.y).abs() < 1.0;
+        if same {
+            return false;
+        }
+        self.fly_to(&output, cam);
+        true
+    }
+
+    /// `move-window` on a split member: it swaps places with its neighbour
+    /// on that side. False when it is in no split.
+    pub fn split_move(&mut self, window: u64, side: Dir) -> bool {
+        let Some(si) = self.split_index_of(window) else {
+            return false;
+        };
+        let gap = self.config.appearance.gaps as f64;
+        if self.splits[si].swap_toward(window, side, gap) {
+            self.relayout_split(si);
+        }
+        true
+    }
+
+    /// Where the window being dragged would drop into a split at the
+    /// cursor: (split, member, side) and the screen rectangle to preview.
+    pub fn split_drop_target(
+        &self,
+        output: &Output,
+        dragged: u64,
+    ) -> Option<(DropTarget, Rectangle<f64, Logical>)> {
+        let ws = self.output_ws(output);
+        let cam = self.camera(output);
+        let p = cam.to_canvas(self.cursor_local(output));
+        let gap = self.config.appearance.gaps as f64;
+        self.splits.iter().filter(|s| s.ws == ws).find_map(|s| {
+            let (member, side, half) = s.drop_target(p, gap, dragged)?;
+            let screen = Rectangle::new(cam.to_screen(half.loc), half.size.upscale(cam.zoom));
+            Some(((s.id, member, side), screen))
+        })
+    }
+
+    /// The dragged window was dropped on a split: it joins it there.
+    pub fn split_drop(&mut self, window: u64, target: DropTarget) {
+        let (_, member, side) = target;
+        self.leave_split(window);
+        if let Some(frame) = self.join_split(member, window, side) {
+            if let Some(idx) = self.index_of_id(window) {
+                let title = self.title_height(&self.windows[idx]);
+                let m = &mut self.windows[idx];
+                m.placement = Placement::Canvas;
+                m.pos = Point::from((frame.loc.x, frame.loc.y + title));
+            }
+        }
+    }
+
+    /// Outlines of the splits on `ws`, canvas units, and whether the
+    /// focused window is in each (for drawing).
+    pub fn split_outlines(&self, ws: usize) -> Vec<(u64, Rectangle<f64, Logical>, bool)> {
+        let focused = self.focused_index().map(|i| self.windows[i].id);
+        self.splits
+            .iter()
+            .filter(|s| s.ws == ws)
+            .map(|s| {
+                (
+                    s.id,
+                    s.rect,
+                    focused.is_some_and(|f| s.position(f).is_some()),
+                )
+            })
+            .collect()
+    }
+}
+
 /// Cursor for a handle.
 pub fn handle_icon(handle: Handle) -> CursorIcon {
     match handle {
@@ -657,6 +904,38 @@ mod tests {
         let d = Split::dragged(&s, Handle::Whole, (300.0, -50.0).into(), 10.0);
         assert_eq!(d.rect, rect(300.0, -50.0, 1010.0, 600.0));
         assert_eq!(d.layout(10.0)[1].1.loc, Point::from((810.0, -50.0)));
+    }
+
+    #[test]
+    fn swapping_moves_a_window_to_its_neighbours_place() {
+        let mut s = two_columns();
+        s.insert(20, 30, Dir::Down);
+        assert!(s.swap_toward(10, Dir::Right, 10.0));
+        assert_eq!(s.position(10), Some((1, 0)));
+        assert_eq!(s.position(20), Some((0, 0)));
+        assert!(s.swap_toward(10, Dir::Down, 10.0));
+        assert_eq!(s.position(10), Some((1, 1)));
+        assert!(!s.swap_toward(10, Dir::Down, 10.0));
+    }
+
+    #[test]
+    fn dropping_on_a_member_picks_its_nearest_side() {
+        let s = two_columns();
+        let (m, side, half) = s.drop_target((900.0, 300.0).into(), 10.0, 0).unwrap();
+        assert_eq!((m, side), (20, Dir::Right));
+        assert_eq!(half, rect(760.0, 0.0, 250.0, 600.0));
+        let (_, side, _) = s.drop_target((760.0, 50.0).into(), 10.0, 0).unwrap();
+        assert_eq!(side, Dir::Up);
+        assert!(s.drop_target((505.0, 300.0).into(), 10.0, 0).is_none());
+    }
+
+    #[test]
+    fn an_away_member_keeps_its_place() {
+        let mut s = two_columns();
+        assert!(s.set_away(10, true));
+        assert!(s.is_away(10));
+        assert_eq!(s.layout(10.0).len(), 2);
+        assert!(s.drop_target((250.0, 300.0).into(), 10.0, 0).is_none());
     }
 
     #[test]

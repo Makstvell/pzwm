@@ -241,7 +241,11 @@ impl State {
             }),
             Action::FitWindow => focused.into_iter().for_each(|i| {
                 self.remember_camera_of_ws(self.windows[i].ws);
-                self.fit_window(i)
+                // A split member: the whole split first, then the window.
+                let id = self.windows[i].id;
+                if !self.fit_split(id) {
+                    self.fit_window(i)
+                }
             }),
             Action::Profile(args) => {
                 let args: Vec<&str> = args.split_whitespace().collect();
@@ -321,7 +325,15 @@ impl State {
                 self.window_digit(digit)
             }
             Action::MoveWindow(dir) => {
-                if let Some(i) = focused {
+                // In a split: swap places with the neighbour on that side.
+                let in_split = focused.is_some_and(|i| {
+                    let id = self.windows[i].id;
+                    self.split_index_of(id).is_some() && !self.split_is_away(id)
+                });
+                if let (true, Some(i)) = (in_split, focused) {
+                    let id = self.windows[i].id;
+                    self.split_move(id, dir);
+                } else if let Some(i) = focused {
                     let (dx, dy) = dir.vector();
                     let scale = output
                         .as_ref()
