@@ -616,14 +616,13 @@ fn beside_key(pressed: Mods, sym: Keysym) -> Option<&'static str> {
 
 /// Keys the map at the cursor takes while it is open: left / right (h, l)
 /// step through the windows by number like Super+1 … 0, up / down (k, j)
-/// go to the window above or below, a digit jumps to that window, Enter
-/// closes the map.
+/// go to the window above or below, digits jump to that window (typed one
+/// after another, like Super+1 2: window 12), Enter closes the map.
 fn map_key(sym: Keysym) -> Option<Action> {
-    if (Keysym::_1.raw()..=Keysym::_9.raw()).contains(&sym.raw()) {
-        return Some(Action::FocusNth((sym.raw() - Keysym::_1.raw()) as usize));
+    if (Keysym::_0.raw()..=Keysym::_9.raw()).contains(&sym.raw()) {
+        return Some(Action::WindowDigit((sym.raw() - Keysym::_0.raw()) as usize));
     }
     Some(match sym {
-        Keysym::_0 => Action::FocusNth(9),
         Keysym::Left | Keysym::h => Action::FocusNumber(false),
         Keysym::Right | Keysym::l => Action::FocusNumber(true),
         Keysym::Up | Keysym::k => Action::FocusDir(Dir::Up),
@@ -642,8 +641,8 @@ mod tests {
         assert_eq!(map_key(Keysym::l), Some(Action::FocusNumber(true)));
         assert_eq!(map_key(Keysym::Left), Some(Action::FocusNumber(false)));
         assert_eq!(map_key(Keysym::j), Some(Action::FocusDir(Dir::Down)));
-        assert_eq!(map_key(Keysym::_3), Some(Action::FocusNth(2)));
-        assert_eq!(map_key(Keysym::_0), Some(Action::FocusNth(9)));
+        assert_eq!(map_key(Keysym::_3), Some(Action::WindowDigit(3)));
+        assert_eq!(map_key(Keysym::_0), Some(Action::WindowDigit(0)));
         assert_eq!(map_key(Keysym::a), None);
     }
 }
