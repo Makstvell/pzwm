@@ -744,6 +744,14 @@ impl State {
 
     pub fn focus_window(&mut self, window: Option<Window>) {
         if let Some(w) = &window {
+            // A window not shown yet takes focus once it is (map_window,
+            // show_picked); focusing it now would send keys nowhere.
+            if self
+                .index_of(w)
+                .is_some_and(|i| !self.windows[i].mapped || self.windows[i].awaiting_pick)
+            {
+                return;
+            }
             if let Some(idx) = self.index_of(w) {
                 let m = self.windows.remove(idx);
                 self.windows.insert(0, m);

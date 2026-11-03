@@ -202,8 +202,7 @@ pub fn pick_title(app: &str, number: usize, after: usize) -> String {
 
 /// Notification body: the keys, then the apps still waiting.
 pub fn pick_body(rest: &[String]) -> String {
-    let keys =
-        "Drag out its area · Enter: the middle at the ideal size · arrows or h j k l: beside the focused window · Esc: the middle";
+    let keys = "Drag out its area · Enter: the middle at the ideal size · arrows or h j k l: beside the focused window · Esc: the middle";
     if rest.is_empty() {
         return keys.into();
     }
