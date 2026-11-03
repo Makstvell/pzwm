@@ -71,6 +71,8 @@ pub enum Action {
     ReleaseInput,
     /// Toggle the mode where plain arrows and h j k l move the view.
     Navigate,
+    /// The next (true) or previous window by number, wrapping around.
+    FocusNumber(bool),
     /// `tile [left|right|up|down|grow DIR|apply|cancel]`: put the focused
     /// window on cells of a grid over the screen, see tile.rs.
     Tile(String),
@@ -165,7 +167,11 @@ impl Action {
             "overview" | "zoom-fit" => Self::Overview,
             "home" => Self::Home,
             "minimap" | "toggle-minimap" => Self::ToggleMinimap,
-            "window" => Self::FocusNth(num().filter(|&n| n >= 1)? - 1),
+            "window" => match arg {
+                "next" => Self::FocusNumber(true),
+                "prev" | "previous" => Self::FocusNumber(false),
+                _ => Self::FocusNth(num().filter(|&n| n >= 1)? - 1),
+            },
             "window-digit" => Self::WindowDigit(num().filter(|&n| n <= 9)?),
             "workspace" => Self::Workspace(num().filter(|n| (1..=10).contains(n))? - 1),
             "move-to-workspace" => {

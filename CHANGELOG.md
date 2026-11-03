@@ -16,6 +16,11 @@ landed on `main`. pzwm has no tagged release yet, so everything is under
 - `Super+N` (`navigate`): a mode where the plain arrows and `h j k l` move
   the view the same way, `+` / `-` zoom, `0` goes home, and `Escape` or
   `Enter` leave it.
+- While the map at the cursor is open (`Super+M`), the plain arrows and
+  `h j k l` pick windows: left / right step to the previous / next window
+  by number (like `Super+1` … `0`, wrapping around), up / down go to the
+  window above / below, a digit jumps straight to that window, `Enter`
+  closes the map. Also `window next` / `window prev` as actions.
 
 ### 2026-11-03: games and calmer window opening
 

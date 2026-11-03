@@ -434,7 +434,7 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | `Super+N` | navigate mode: plain arrows or `h j k l` move the canvas, `+` / `-` zoom, `0` home, `Esc` or `Enter` done |
 | `Super+C` | fit the focused window: center it and zoom to fill the screen |
 | `Super+Tab` or `Super+Z` | overview of all windows; again to go back |
-| `Super+M` | minimap at the cursor (tap: stays open, hold: closes on release) |
+| `Super+M` | minimap at the cursor (tap: stays open, hold: closes on release). While it is open: `←` / `→` or `h` / `l` go to the previous / next window by number (like `Super+1` … `0`), `↑` / `↓` or `k` / `j` to the window above / below, `1` … `0` straight to that window, `Enter` or `Esc` close it |
 | `Super+/` | find a window, group or bookmark |
 | `Super+,` / `Super+.` | camera back / forward |
 | `Super+Alt+Shift+1` … `5` / `Super+Alt+1` … `5` | save bookmark / fly to bookmark |

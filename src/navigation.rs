@@ -257,6 +257,23 @@ impl State {
         }
     }
 
+    /// The next or previous window by `[general] window_numbers`, wrapping.
+    pub fn focus_number_step(&mut self, forward: bool) {
+        let ids = self.numbered_windows();
+        if ids.is_empty() {
+            return;
+        }
+        let current = self.focused_index().map(|i| self.windows[i].id);
+        let pos = current.and_then(|c| ids.iter().position(|&id| id == c));
+        let next = match (pos, forward) {
+            (Some(p), true) => ids[(p + 1) % ids.len()],
+            (Some(p), false) => ids[(p + ids.len() - 1) % ids.len()],
+            (None, true) => ids[0],
+            (None, false) => ids[ids.len() - 1],
+        };
+        self.focus_and_center(next);
+    }
+
     pub fn focus_cycle(&mut self, forward: bool) {
         let ids = self.launch_order();
         if ids.is_empty() {

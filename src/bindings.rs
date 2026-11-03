@@ -96,6 +96,13 @@ impl State {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::ToggleMinimap));
                 }
+                // The map at the cursor is open: plain keys pick windows.
+                if state.map_popup.is_some() && !pressed.logo && !pressed.ctrl && !pressed.alt {
+                    if let Some(action) = map_key(sym) {
+                        state.suppressed_keys.push(keycode);
+                        return FilterResult::Intercept(Some(action));
+                    }
+                }
                 // `navigate`: plain arrows and h j k l move the view.
                 if state.keypan.mode && !pressed.logo && !pressed.ctrl && !pressed.alt {
                     if let Some(key) = crate::keypan::nav_key(sym) {
@@ -275,6 +282,7 @@ impl State {
             Action::Lock => self.lock_session(),
             Action::ReleaseInput => self.release_input(),
             Action::Navigate => self.toggle_navigate(),
+            Action::FocusNumber(forward) => self.focus_number_step(forward),
             Action::IdealSize => {
                 if let Some(i) = focused {
                     self.ideal_size(i);
@@ -604,4 +612,38 @@ fn beside_key(pressed: Mods, sym: Keysym) -> Option<&'static str> {
         Keysym::Right | Keysym::l => "beside right",
         _ => return None,
     })
+}
+
+/// Keys the map at the cursor takes while it is open: left / right (h, l)
+/// step through the windows by number like Super+1 … 0, up / down (k, j)
+/// go to the window above or below, a digit jumps to that window, Enter
+/// closes the map.
+fn map_key(sym: Keysym) -> Option<Action> {
+    if (Keysym::_1.raw()..=Keysym::_9.raw()).contains(&sym.raw()) {
+        return Some(Action::FocusNth((sym.raw() - Keysym::_1.raw()) as usize));
+    }
+    Some(match sym {
+        Keysym::_0 => Action::FocusNth(9),
+        Keysym::Left | Keysym::h => Action::FocusNumber(false),
+        Keysym::Right | Keysym::l => Action::FocusNumber(true),
+        Keysym::Up | Keysym::k => Action::FocusDir(Dir::Up),
+        Keysym::Down | Keysym::j => Action::FocusDir(Dir::Down),
+        Keysym::Return | Keysym::KP_Enter => Action::ToggleMinimap,
+        _ => return None,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_open_map_steps_through_windows() {
+        assert_eq!(map_key(Keysym::l), Some(Action::FocusNumber(true)));
+        assert_eq!(map_key(Keysym::Left), Some(Action::FocusNumber(false)));
+        assert_eq!(map_key(Keysym::j), Some(Action::FocusDir(Dir::Down)));
+        assert_eq!(map_key(Keysym::_3), Some(Action::FocusNth(2)));
+        assert_eq!(map_key(Keysym::_0), Some(Action::FocusNth(9)));
+        assert_eq!(map_key(Keysym::a), None);
+    }
 }
