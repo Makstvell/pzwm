@@ -74,6 +74,13 @@ pub enum Interaction {
         /// Corner where the drag started, canvas units.
         start: Point<f64, Logical>,
     },
+    /// Dragging a divider or an outer edge of a split, see split.rs.
+    SplitDrag {
+        base: crate::split::Split,
+        handle: crate::split::Handle,
+        /// Canvas point where the drag began.
+        start: Point<f64, Logical>,
+    },
     Resize {
         id: u64,
         edges: ResizeEdge,
@@ -196,6 +203,12 @@ pub fn start_group_move(state: &mut State, serial: Serial, button: u32) -> bool 
     let Some(idx) = state.focused_index() else {
         return false;
     };
+    // A split moves as one piece.
+    let id = state.windows[idx].id;
+    if let Some(si) = state.split_index_of(id) {
+        let split = state.splits[si].id;
+        return start_split_drag(state, split, crate::split::Handle::Whole, serial, button);
+    }
     let m = &state.windows[idx];
     let (Some(name), Placement::Canvas) = (m.group.clone(), m.placement) else {
         start_move_with_button(state, idx, serial, button);
@@ -235,7 +248,41 @@ pub fn start_move(state: &mut State, idx: usize, serial: Serial) {
     start_move_with_button(state, idx, serial, 0x110);
 }
 
+/// Starts dragging handle `handle` of split `split` (a divider, or its edge).
+pub fn start_split_drag(
+    state: &mut State,
+    split: u64,
+    handle: crate::split::Handle,
+    serial: Serial,
+    button: u32,
+) -> bool {
+    let (Some(base), Some(output)) = (state.split_by_id(split), state.active_output()) else {
+        return false;
+    };
+    let start = state.camera(&output).to_canvas(state.cursor_local(&output));
+    begin(
+        state,
+        Interaction::SplitDrag {
+            base,
+            handle,
+            start,
+        },
+        crate::split::handle_icon(handle),
+        serial,
+        button,
+    );
+    true
+}
+
 pub fn start_move_with_button(state: &mut State, idx: usize, serial: Serial, button: u32) {
+    // Dragged away by its title: out of its split.
+    let id = state.windows[idx].id;
+    if state.split_index_of(id).is_some() {
+        state.leave_split(id);
+    }
+    let Some(idx) = state.index_of_id(id) else {
+        return;
+    };
     let Some(output) = state.active_output() else {
         return;
     };
@@ -422,6 +469,18 @@ impl State {
             Interaction::Tile { output } => {
                 self.tile_drag_to_cursor(false);
                 Interaction::Tile { output }
+            }
+            Interaction::SplitDrag {
+                base,
+                handle,
+                start,
+            } => {
+                self.drag_split_handle(&base, handle, start);
+                Interaction::SplitDrag {
+                    base,
+                    handle,
+                    start,
+                }
             }
             Interaction::Resize {
                 id,
@@ -712,7 +771,12 @@ impl State {
                 self.area_drag_finished(&output, ws, start)
             }
             Some(Interaction::Tile { .. }) => self.tile_apply(),
-            Some(Interaction::Pan { .. } | Interaction::MoveGroup { .. }) | None => {}
+            Some(
+                Interaction::Pan { .. }
+                | Interaction::MoveGroup { .. }
+                | Interaction::SplitDrag { .. },
+            )
+            | None => {}
         }
         // We are inside the pointer's grab callback: touching the pointer
         // here would deadlock, so refresh focus once the grab is gone.

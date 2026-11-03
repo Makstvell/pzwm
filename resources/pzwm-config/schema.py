@@ -231,6 +231,7 @@ KEY_ACTIONS = (
     "minimap",
     "home",
     "navigate",
+    "split",
     "pan left",
     "zoom-in",
     "zoom-out",

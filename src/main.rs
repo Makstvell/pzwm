@@ -39,6 +39,7 @@ mod scratchpad;
 mod screencopy;
 mod shell;
 mod sizehint;
+mod split;
 mod state;
 mod tablet;
 mod theme;

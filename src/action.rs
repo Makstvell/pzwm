@@ -73,6 +73,8 @@ pub enum Action {
     Navigate,
     /// The next (true) or previous window by number, wrapping around.
     FocusNumber(bool),
+    /// Make the focused window a split filling the view, or take it out.
+    Split,
     /// `tile [left|right|up|down|grow DIR|apply|cancel]`: put the focused
     /// window on cells of a grid over the screen, see tile.rs.
     Tile(String),
@@ -149,6 +151,7 @@ impl Action {
             "lock" | "lock-session" => Self::Lock,
             "release-input" => Self::ReleaseInput,
             "navigate" | "navigation" => Self::Navigate,
+            "split" => Self::Split,
             "tile" | "grid" => Self::Tile(arg.to_string()),
             "arrange" => Self::Arrange(crate::arrange::Arrangement::parse(arg)?),
             "present" | "presentation" => Self::Present(arg.to_string()),

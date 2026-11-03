@@ -6,6 +6,29 @@ landed on `main`. pzwm has no tagged release yet, so everything is under
 
 ## Unreleased
 
+### 2026-11-03: splits
+
+**Added**
+- **Splits**: windows tiled together over one area of the canvas, in
+  columns that each hold one or more rows. Drag the gap (or the shared
+  edge) between two and both resize, like snapped windows in Windows;
+  double-click it to share evenly; drag an outer edge to grow the whole
+  split; `Super+Alt` + left drag moves it as one piece.
+- `Super+S` (`split`) turns the focused window into a split filling the
+  view; pressed again on a member it takes the window out.
+- While a new window waits for its place, an arrow or `h j k l` puts it
+  into the focused window's split on that side: a new column left or
+  right, a new row above or below.
+- Windows snapped next to each other (halves, thirds, quarters, the tile
+  grid) join up into a split by themselves.
+- A window that closes, is maximized, pinned, moved or dragged away by its
+  title leaves its split, and the others take its space.
+
+**Changed**
+- A window an app opens by itself keeps the size the app gave it again
+  (it was enlarged to the ideal size, which turned helper windows such as
+  Zoom's into big empty windows).
+
 ### 2026-11-03: moving around with the keyboard
 
 **Added**

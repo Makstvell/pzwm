@@ -283,6 +283,10 @@ impl State {
             Action::ReleaseInput => self.release_input(),
             Action::Navigate => self.toggle_navigate(),
             Action::FocusNumber(forward) => self.focus_number_step(forward),
+            Action::Split => {
+                let result = self.toggle_split();
+                self.notify_result("split", result, false);
+            }
             Action::IdealSize => {
                 if let Some(i) = focused {
                     self.ideal_size(i);

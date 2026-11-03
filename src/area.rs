@@ -517,6 +517,13 @@ impl State {
             .or_else(|| self.windows.iter().find(usable))?;
         let anchor_id = anchor.id;
         let anchor = self.canvas_frame(anchor);
+        let side = side.unwrap_or_else(|| reading_side(self.numbering()));
+        // The focused window is in a split: the new one joins it there.
+        if let Some(new) = skip {
+            if self.split_index_of(anchor_id).is_some() {
+                return self.join_split(anchor_id, new, side);
+            }
+        }
         let size = self.ideal_sizes(output).first()?.size;
         let others: Vec<_> = self
             .windows
@@ -526,7 +533,6 @@ impl State {
             .map(|o| (o.id, self.canvas_frame(o)))
             .collect();
         let gap = (self.config.appearance.gaps as f64).max(MIN_SIBLING_GAP);
-        let side = side.unwrap_or_else(|| reading_side(self.numbering()));
         let (loc, moves) = insert_beside(anchor, size, &others, gap, side);
         let mut pushed = Vec::new();
         for (id, delta) in moves {
@@ -816,22 +822,9 @@ impl State {
                 None,
             ));
         }
-        // A full window of its own: the ideal size.
-        let ideal = self
-            .outputs
-            .iter()
-            .find(|o| self.output_ws(o) == ws)
-            .and_then(|o| self.ideal_sizes(o).first().map(|i| i.size));
-        let (frame, resize) = match ideal {
-            Some(s) => (
-                s,
-                Some(Size::from((
-                    s.w.round() as i32,
-                    (s.h - title).round().max(1.0) as i32,
-                ))),
-            ),
-            None => (frame, None),
-        };
+        // It keeps the size the app gave it: helper windows (Zoom's share
+        // toolbar, overlays) must not grow into empty screen-sized windows.
+        let resize = None;
         let others: Vec<_> = self
             .windows
             .iter()

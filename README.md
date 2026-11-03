@@ -80,26 +80,27 @@ further windows always open by the window they belong to. Details:
 4. [First steps](#first-steps)
 5. [How it works](#how-it-works)
 6. [Where new windows open](#where-new-windows-open) (size hints, window numbers)
-7. [Putting windows on the screen: tile grid, halves, corners](#putting-windows-on-the-screen-tile-grid-halves-corners)
-8. [Shortcuts](#shortcuts)
-9. [Helper apps](#helper-apps)
-10. [Settings app: pzwm config](#settings-app-pzwm-config)
-11. [Configuration file](#configuration-file)
-12. [Workspaces and the bar](#workspaces-and-the-bar)
-13. [Monitors](#monitors)
-14. [Idle, lock and sleep](#idle-lock-and-sleep)
-15. [Dark mode](#dark-mode)
-16. [Desktop profiles](#desktop-profiles)
-17. [Groups, bookmarks and find](#groups-bookmarks-and-find)
-18. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
-19. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
-20. [Scripting: pzwm msg](#scripting-pzwm-msg)
-21. [Works with](#works-with)
-22. [Troubleshooting](#troubleshooting)
-23. [For developers](#for-developers)
-24. [Similar projects](#similar-projects)
-25. [Credits](#credits)
-26. [License](#license)
+7. [Splits: windows tiled together](#splits-windows-tiled-together)
+8. [Putting windows on the screen: tile grid, halves, corners](#putting-windows-on-the-screen-tile-grid-halves-corners)
+9. [Shortcuts](#shortcuts)
+10. [Helper apps](#helper-apps)
+11. [Settings app: pzwm config](#settings-app-pzwm-config)
+12. [Configuration file](#configuration-file)
+13. [Workspaces and the bar](#workspaces-and-the-bar)
+14. [Monitors](#monitors)
+15. [Idle, lock and sleep](#idle-lock-and-sleep)
+16. [Dark mode](#dark-mode)
+17. [Desktop profiles](#desktop-profiles)
+18. [Groups, bookmarks and find](#groups-bookmarks-and-find)
+19. [Drawing, presentation, arrange, semantic zoom](#drawing-presentation-arrange-semantic-zoom)
+20. [Screen sharing and screenshots](#screen-sharing-and-screenshots)
+21. [Scripting: pzwm msg](#scripting-pzwm-msg)
+22. [Works with](#works-with)
+23. [Troubleshooting](#troubleshooting)
+24. [For developers](#for-developers)
+25. [Similar projects](#similar-projects)
+26. [Credits](#credits)
+27. [License](#license)
 
 ## What's new
 
@@ -109,6 +110,7 @@ Every change, by date: [CHANGELOG.md](CHANGELOG.md).
 |---|---|---|
 | Several windows waiting for their place: a card at the cursor shows a live miniature of the one you place now, its app icon and one dot per waiting window (the current one lit); the notification says "2 of 3" and which apps come next | pick mode | [Where new windows open](#where-new-windows-open) |
 | Open a window right next to the focused one at the ideal size, pushing the windows there along (they move back when it closes): in the order of window numbers, or on the side you choose with an arrow or h j k l while picking; Enter opens it in the middle at the ideal size | `[canvas] new_window_placement = "beside"`; arrows, h j k l, Enter while picking |
+| **Splits**: windows tiled together over one area, in columns and rows. Drag the gap between two and both resize (double-click: even); new windows join with an arrow while you pick their place; snapped halves and quarters join up by themselves | `Super+S`; arrows while picking; drag the gaps | [Splits](#splits-windows-tiled-together) |
 | Move around the canvas from the keyboard: hold `Super+Alt` + arrows or `h j k l`, or `Super+N` for a mode where the plain arrows and `h j k l` do it | `Super+Alt+arrows`, `Super+Alt+h/j/k/l`, `Super+N`; `[canvas] pan_speed` | [Shortcuts](#zoom-and-move-around) |
 | Games: `Super+Escape` always takes the keyboard and the mouse back from a game that holds them; click the game to give them back | `Super+Escape` | [Troubleshooting](#troubleshooting) |
 | Pan and zoom only with Super, so plain scrolling and dragging go to games and apps | `[canvas] super_navigation = true` | [Configuration file](#configuration-file) |
@@ -380,6 +382,23 @@ alone counts). `[general] window_numbers` sets the counting:
 Windows whose tops are within half a window of each other count as one
 row. From scripts: `pzwm msg window 12`.
 
+## Splits: windows tiled together
+
+A split is a few windows tiled over one area of the canvas, in columns
+that each hold one or more rows, like windows snapped side by side in
+Windows, but they stay one piece on the canvas: pan away, zoom out, come
+back, and they are still together.
+
+| Do | How |
+|---|---|
+| Make one | `Super+S`: the focused window fills the view and becomes a split (with `tile_mode = "zoom"`, at 100 % first) |
+| Add a window | while a new window waits for its place, an arrow or `h j k l` puts it into the focused window's split on that side: `←` / `→` a new column, `↑` / `↓` a new row in that column; the others shrink to make room |
+| Snap two together | `Super+[` / `Super+]`, a drop on a screen edge or corner, or the tile grid: a window that lines up with a neighbour (same top and height side by side, or same left and width stacked) joins it into a split |
+| Resize two at once | drag the gap between them, or the edge they share; double-click it to share evenly |
+| Grow the whole split | drag one of its outer edges |
+| Move the whole split | `Super+Alt` + left drag on any of its windows |
+| Take a window out | `Super+S` on it, drag it away by its title, maximize, pin or close it; the others take its space |
+
 ## Putting windows on the screen: tile grid, halves, corners
 
 The windows still live on the canvas; these place one on part of what the
@@ -431,6 +450,7 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | `Super+BackSpace` | zoom to 100 % |
 | `Super+Home` | go back to the start of the canvas, at `[canvas] start_zoom` |
 | `Super+Alt` + arrows or `h j k l` | move the canvas, smoothly for as long as you hold the key (`Shift`: faster; `[canvas] pan_speed`) |
+| `Super+S` | split: the focused window becomes one (again: takes it out), see [Splits](#splits-windows-tiled-together) |
 | `Super+N` | navigate mode: plain arrows or `h j k l` move the canvas, `+` / `-` zoom, `0` home, `Esc` or `Enter` done |
 | `Super+C` | fit the focused window: center it and zoom to fill the screen |
 | `Super+Tab` or `Super+Z` | overview of all windows; again to go back |

@@ -481,6 +481,13 @@ impl State {
         output: &Output,
         rect: Rectangle<f64, Logical>,
     ) {
+        // Snapped somewhere new: out of its split; it may join one again
+        // with the window it now lines up with.
+        let id = self.windows[idx].id;
+        self.leave_split(id);
+        let Some(idx) = self.index_of_id(id) else {
+            return;
+        };
         if self.windows[idx].placement == Placement::Canvas {
             match self.config.canvas.tile_mode.as_str() {
                 "canvas" => {}
@@ -519,6 +526,7 @@ impl State {
             (canvas_rect.size.h - title).round().max(1.0) as i32,
         ));
         self.configure(idx, Some(size), false, false);
+        self.link_snapped(idx);
         self.queue_redraw_all();
     }
 }

@@ -700,6 +700,8 @@ impl State {
         };
         let removed = self.windows.remove(idx);
         self.forget_pick(removed.id);
+        // Its split closes the gap.
+        self.leave_split(removed.id);
         // The windows it pushed aside close the gap again.
         for (id, delta, ended_at) in &removed.pushed {
             if let Some(i) = self.index_of_id(*id) {
@@ -894,6 +896,12 @@ impl State {
         let Some(output) = self.output_of(idx) else {
             return;
         };
+        // Out of the canvas layout: out of its split too.
+        let id = self.windows[idx].id;
+        self.leave_split(id);
+        let Some(idx) = self.index_of_id(id) else {
+            return;
+        };
         self.save_restore(idx);
         let area = self.usable_area(&output);
         let gap = self.config.appearance.gaps;
@@ -914,6 +922,12 @@ impl State {
 
     pub fn fullscreen(&mut self, idx: usize) {
         let Some(output) = self.output_of(idx) else {
+            return;
+        };
+        // Out of the canvas layout: out of its split too.
+        let id = self.windows[idx].id;
+        self.leave_split(id);
+        let Some(idx) = self.index_of_id(id) else {
             return;
         };
         self.save_restore(idx);
@@ -967,6 +981,12 @@ impl State {
         let Some(output) = self.output_of(idx) else {
             return;
         };
+        // Out of the canvas layout: out of its split too.
+        let id = self.windows[idx].id;
+        self.leave_split(id);
+        let Some(idx) = self.index_of_id(id) else {
+            return;
+        };
         let Some(view) = self.view(&self.windows[idx], &output) else {
             return;
         };
@@ -1012,6 +1032,12 @@ impl State {
 
     /// Moves the camera so the window sits in the middle of the screen.
     pub fn move_by(&mut self, idx: usize, delta: Point<f64, Logical>) {
+        // Moved on its own: out of its split.
+        let id = self.windows[idx].id;
+        self.leave_split(id);
+        let Some(idx) = self.index_of_id(id) else {
+            return;
+        };
         let m = &mut self.windows[idx];
         if matches!(m.placement, Placement::Canvas | Placement::Pinned) {
             m.pos += delta;

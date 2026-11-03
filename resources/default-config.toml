@@ -335,6 +335,9 @@ locked_screen_off_after = 60          # once locked, screens off after 1 min
 "Super+Alt+j" = "pan down"
 "Super+Alt+k" = "pan up"
 "Super+Alt+l" = "pan right"
+# Split: the focused window fills the view and new windows join it with an
+# arrow while you pick their place; drag the gaps between them. Again: leave.
+"Super+S" = "split"
 # Navigate mode: plain arrows or h j k l move the view, + - zoom, 0 home, Esc done.
 "Super+N" = "navigate"
 "Super+bracketleft" = "snap left"

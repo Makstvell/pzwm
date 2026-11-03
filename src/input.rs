@@ -7,6 +7,7 @@
 use std::time::{Duration, Instant};
 
 use crate::{
+    action::Dir,
     config::{MouseAction, MouseTrigger},
     grabs,
     minimap::MapHit,
@@ -26,7 +27,10 @@ use smithay::{
         GestureSwipeUpdateEvent, MotionEvent, RelativeMotionEvent,
     },
     output::Output,
-    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    reexports::{
+        wayland_protocols::xdg::shell::server::xdg_toplevel::ResizeEdge,
+        wayland_server::protocol::wl_surface::WlSurface,
+    },
     utils::{Logical, Point},
     wayland::{
         compositor::with_states,
@@ -412,7 +416,15 @@ impl State {
                     _ => (None, Some(CursorIcon::Default)),
                 }
             }
-            Under::Empty => (None, Some(CursorIcon::Default)),
+            Under::Empty => {
+                let handle = self
+                    .output_at(self.cursor)
+                    .and_then(|o| self.split_handle_at_cursor(&o));
+                (
+                    None,
+                    Some(handle.map_or(CursorIcon::Default, |(_, h)| crate::split::handle_icon(h))),
+                )
+            }
             Under::Minimap => (None, Some(CursorIcon::Pointer)),
             Under::Surface { .. } => (None, None),
         };
@@ -674,7 +686,20 @@ impl State {
                         grabs::start_pan(self, serial, button)
                     }
                     (Hit::Edge(edges), BTN_LEFT) => {
-                        grabs::start_resize_with_button(self, idx, edges, serial, button)
+                        // A split member's edge moves the split's divider or
+                        // its outer edge; others resize the window alone.
+                        let handle =
+                            edge_dir(edges).and_then(|d| self.split_handle_for_edge(idx, d));
+                        match handle {
+                            Some((split, handle)) => {
+                                if !self.press_split_handle(split, handle) {
+                                    grabs::start_split_drag(self, split, handle, serial, button);
+                                }
+                            }
+                            None => {
+                                grabs::start_resize_with_button(self, idx, edges, serial, button)
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -687,6 +712,16 @@ impl State {
                     });
                     if let Some(name) = collapsed {
                         let _ = self.group_toggle(Some(&name));
+                        return;
+                    }
+                    // The gap between two windows of a split: drag it.
+                    let handle = self
+                        .active_output()
+                        .and_then(|o| self.split_handle_at_cursor(&o));
+                    if let Some((split, handle)) = handle {
+                        if !self.press_split_handle(split, handle) {
+                            grabs::start_split_drag(self, split, handle, serial, button);
+                        }
                         return;
                     }
                     // A click on the bare canvas leaves no window focused.
@@ -975,6 +1010,17 @@ impl State {
             self.pan(output, delta.upscale(factor), false);
         }
     }
+}
+
+/// The side a plain (not corner) resize edge is on.
+fn edge_dir(edges: ResizeEdge) -> Option<Dir> {
+    Some(match edges {
+        ResizeEdge::Left => Dir::Left,
+        ResizeEdge::Right => Dir::Right,
+        ResizeEdge::Top => Dir::Up,
+        ResizeEdge::Bottom => Dir::Down,
+        _ => return None,
+    })
 }
 
 fn window_under(idx: usize, hit: Hit) -> Under {
