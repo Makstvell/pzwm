@@ -103,6 +103,8 @@ further windows always open by the window they belong to. Details:
 
 ## What's new
 
+Every change, by date: [CHANGELOG.md](CHANGELOG.md).
+
 | Feature | Keys / option | More |
 |---|---|---|
 | Several windows waiting for their place: a card at the cursor shows a live miniature of the one you place now, its app icon and one dot per waiting window (the current one lit); the notification says "2 of 3" and which apps come next | pick mode | [Where new windows open](#where-new-windows-open) |
