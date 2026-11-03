@@ -109,6 +109,7 @@ Every change, by date: [CHANGELOG.md](CHANGELOG.md).
 |---|---|---|
 | Several windows waiting for their place: a card at the cursor shows a live miniature of the one you place now, its app icon and one dot per waiting window (the current one lit); the notification says "2 of 3" and which apps come next | pick mode | [Where new windows open](#where-new-windows-open) |
 | Open a window right next to the focused one at the ideal size, pushing the windows there along (they move back when it closes): in the order of window numbers, or on the side you choose with an arrow or h j k l while picking; Enter opens it in the middle at the ideal size | `[canvas] new_window_placement = "beside"`; arrows, h j k l, Enter while picking |
+| Move around the canvas from the keyboard: hold `Super+Alt` + arrows or `h j k l`, or `Super+N` for a mode where the plain arrows and `h j k l` do it | `Super+Alt+arrows`, `Super+Alt+h/j/k/l`, `Super+N`; `[canvas] pan_speed` | [Shortcuts](#zoom-and-move-around) |
 | Games: `Super+Escape` always takes the keyboard and the mouse back from a game that holds them; click the game to give them back | `Super+Escape` | [Troubleshooting](#troubleshooting) |
 | Pan and zoom only with Super, so plain scrolling and dragging go to games and apps | `[canvas] super_navigation = true` | [Configuration file](#configuration-file) |
 | Opening a window never zooms; the camera only pans when the new window would be out of sight | | [Where new windows open](#where-new-windows-open) | [Where new windows open](#where-new-windows-open) |
@@ -429,7 +430,8 @@ or in the `[binds]` and `[mouse]` sections of the config.
 | `Super+=` / `Super+-` | zoom in / out |
 | `Super+BackSpace` | zoom to 100 % |
 | `Super+Home` | go back to the start of the canvas, at `[canvas] start_zoom` |
-| `Super+Alt+arrows` | move the canvas |
+| `Super+Alt` + arrows or `h j k l` | move the canvas, smoothly for as long as you hold the key (`Shift`: faster; `[canvas] pan_speed`) |
+| `Super+N` | navigate mode: plain arrows or `h j k l` move the canvas, `+` / `-` zoom, `0` home, `Esc` or `Enter` done |
 | `Super+C` | fit the focused window: center it and zoom to fill the screen |
 | `Super+Tab` or `Super+Z` | overview of all windows; again to go back |
 | `Super+M` | minimap at the cursor (tap: stays open, hold: closes on release) |

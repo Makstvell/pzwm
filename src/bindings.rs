@@ -54,6 +54,7 @@ impl State {
                     if state.map_popup.as_ref().and_then(|p| p.key) == Some(keycode) {
                         state.map_key_released();
                     }
+                    state.key_pan_release(keycode);
                     return match state.suppressed_keys.iter().position(|k| *k == keycode) {
                         Some(i) => {
                             state.suppressed_keys.remove(i);
@@ -95,6 +96,23 @@ impl State {
                     state.suppressed_keys.push(keycode);
                     return FilterResult::Intercept(Some(Action::ToggleMinimap));
                 }
+                // `navigate`: plain arrows and h j k l move the view.
+                if state.keypan.mode && !pressed.logo && !pressed.ctrl && !pressed.alt {
+                    if let Some(key) = crate::keypan::nav_key(sym) {
+                        state.suppressed_keys.push(keycode);
+                        let action = match key {
+                            crate::keypan::NavKey::Pan(dir) => {
+                                state.key_pan_press(keycode, dir);
+                                None
+                            }
+                            crate::keypan::NavKey::ZoomIn => Some(Action::ZoomIn),
+                            crate::keypan::NavKey::ZoomOut => Some(Action::ZoomOut),
+                            crate::keypan::NavKey::Home => Some(Action::Home),
+                            crate::keypan::NavKey::Exit => Some(Action::Navigate),
+                        };
+                        return FilterResult::Intercept(action);
+                    }
+                }
                 if state.tile.is_some() && !pressed.logo {
                     if let Some(action) = tile_key(pressed, sym) {
                         state.suppressed_keys.push(keycode);
@@ -128,6 +146,12 @@ impl State {
                         state.suppressed_keys.push(keycode);
                         let digit = (sym.raw() - Keysym::_0.raw()) as usize;
                         FilterResult::Intercept(Some(Action::WindowDigit(digit)))
+                    }
+                    // A pan key glides the view for as long as it is held.
+                    Some(Action::Pan(dir)) => {
+                        state.suppressed_keys.push(keycode);
+                        state.key_pan_press(keycode, dir);
+                        FilterResult::Intercept(None)
                     }
                     Some(action) => {
                         state.suppressed_keys.push(keycode);
@@ -250,6 +274,7 @@ impl State {
             }
             Action::Lock => self.lock_session(),
             Action::ReleaseInput => self.release_input(),
+            Action::Navigate => self.toggle_navigate(),
             Action::IdealSize => {
                 if let Some(i) = focused {
                     self.ideal_size(i);

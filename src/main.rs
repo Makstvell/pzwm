@@ -25,6 +25,7 @@ mod image_copy;
 mod input;
 mod ipc;
 mod jumps;
+mod keypan;
 mod minimap;
 mod navigation;
 mod numbering;

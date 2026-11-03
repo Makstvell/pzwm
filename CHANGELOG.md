@@ -6,6 +6,17 @@ landed on `main`. pzwm has no tagged release yet, so everything is under
 
 ## Unreleased
 
+### 2026-11-03: moving around with the keyboard
+
+**Added**
+- Hold `Super+Alt` + arrows, or `h j k l` like in vim, and the view glides
+  across the canvas for as long as the key is down, speeding up a little;
+  `Shift` goes three times faster. Two keys at once move diagonally.
+  `[canvas] pan_speed` sets the speed (screen pixels per second).
+- `Super+N` (`navigate`): a mode where the plain arrows and `h j k l` move
+  the view the same way, `+` / `-` zoom, `0` goes home, and `Escape` or
+  `Enter` leave it.
+
 ### 2026-11-03: games and calmer window opening
 
 **Added**

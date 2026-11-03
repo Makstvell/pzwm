@@ -129,6 +129,8 @@ pub struct Canvas {
     pub edge_tiling: bool,
     /// Pixels the canvas moves per keyboard pan step.
     pub pan_step: f64,
+    /// Screen pixels per second a held pan key (or `navigate`) moves the view.
+    pub pan_speed: f64,
     /// Pixels a window moves/resizes per keyboard step.
     pub window_step: i32,
     /// Grid drawn on the canvas: "dots", "lines" or "none".
@@ -502,6 +504,7 @@ impl Default for Canvas {
             snap_distance: 14.0,
             edge_tiling: true,
             pan_step: 160.0,
+            pan_speed: 1400.0,
             window_step: 40,
             grid: "dots".into(),
             grid_spacing: 32.0,

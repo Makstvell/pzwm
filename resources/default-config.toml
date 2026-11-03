@@ -66,7 +66,8 @@ middle_drag_over_windows = true  # middle-drag pans over windows too; a plain mi
 super_navigation = false
 snap_distance = 14.0    # magnetic edges while dragging, in screen pixels
 edge_tiling = true      # drop a window on the left/right screen edge to tile it
-pan_step = 160.0        # keyboard pan step
+pan_step = 160.0        # keyboard pan step (pzwm msg pan)
+pan_speed = 1400.0      # held pan keys / navigate mode: screen pixels per second (Shift: x3)
 window_step = 40        # keyboard move/resize step
 grid = "dots"           # "dots", "lines" or "none"
 grid_spacing = 32.0
@@ -330,6 +331,12 @@ locked_screen_off_after = 60          # once locked, screens off after 1 min
 "Super+Alt+Right" = "pan right"
 "Super+Alt+Up" = "pan up"
 "Super+Alt+Down" = "pan down"
+"Super+Alt+h" = "pan left"
+"Super+Alt+j" = "pan down"
+"Super+Alt+k" = "pan up"
+"Super+Alt+l" = "pan right"
+# Navigate mode: plain arrows or h j k l move the view, + - zoom, 0 home, Esc done.
+"Super+N" = "navigate"
 "Super+bracketleft" = "snap left"
 "Super+bracketright" = "snap right"
 

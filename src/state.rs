@@ -202,6 +202,8 @@ pub struct State {
     /// A window whose keyboard-shortcut inhibitor and pointer lock were let
     /// go with Super+Escape; they come back when it is clicked.
     pub input_released: Option<WlSurface>,
+    /// Moving the view with held keys and the `navigate` mode (keypan.rs).
+    pub keypan: crate::keypan::KeyPan,
     /// Dimming, screens off, lock and sleep when idle (idle.rs).
     pub idle: crate::idle::IdleState,
     /// The color scheme last applied (theme.rs).
@@ -415,6 +417,7 @@ impl State {
             lock_surfaces: HashMap::new(),
             idle_inhibitors: Vec::new(),
             input_released: None,
+            keypan: Default::default(),
             idle: Default::default(),
             applied_scheme: None,
             render_cache: RenderCache::default(),

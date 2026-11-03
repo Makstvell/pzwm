@@ -69,6 +69,8 @@ pub enum Action {
     Lock,
     /// Take the keyboard shortcuts and the pointer back from a game.
     ReleaseInput,
+    /// Toggle the mode where plain arrows and h j k l move the view.
+    Navigate,
     /// `tile [left|right|up|down|grow DIR|apply|cancel]`: put the focused
     /// window on cells of a grid over the screen, see tile.rs.
     Tile(String),
@@ -144,6 +146,7 @@ impl Action {
             "dpms" | "screens" => Self::Dpms(arg.to_string()),
             "lock" | "lock-session" => Self::Lock,
             "release-input" => Self::ReleaseInput,
+            "navigate" | "navigation" => Self::Navigate,
             "tile" | "grid" => Self::Tile(arg.to_string()),
             "arrange" => Self::Arrange(crate::arrange::Arrangement::parse(arg)?),
             "present" | "presentation" => Self::Present(arg.to_string()),
